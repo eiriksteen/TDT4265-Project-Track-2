@@ -1,0 +1,13 @@
+data
+examples
+
+.DS_Store
+.ENV
+
+*__pycache__*
+
+test.py
+*egg*
+
+*results*
+wandb
