@@ -89,10 +89,10 @@ class Decoder(nn.Module):
         return logits
 
 
-class Unet(nn.Module):
+class Unet2d(nn.Module):
 
     def __init__(self,in_channels: int, out_channels: int):
-        super(Unet, self).__init__()
+        super(Unet2d, self).__init__()
 
         self.encoder = Encoder(in_channels)
         self.decoder = Decoder(out_channels)
