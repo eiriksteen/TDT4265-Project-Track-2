@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import nibabel as nib
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 from pathlib import Path
 from torchvision.transforms import Resize
@@ -60,7 +61,9 @@ class BratsDataset(Dataset):
             images = [i[:,:,self.slice_num-self.offset:self.slice_num+self.offset] for i in images]
         
         if self.normalize:
+            mask = images[1]
             images = [i / (np.abs(i).max() if np.abs(i).max() != 0 else 1) for i in images]
+            images[1] = mask
 
         if self.to_torch:
             images = [i.transpose(2,0,1) for i in images]    
@@ -71,7 +74,7 @@ class BratsDataset(Dataset):
 
         return {
             "image": image,
-            "seg": seg,
+            "seg": seg.long(),
             "t1": t1,
             "t1ce": t1ce,
             "t2": t2
