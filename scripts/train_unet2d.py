@@ -8,11 +8,12 @@ import json
 import seaborn as sns
 import torch.utils
 import torch.utils.data
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from tqdm import tqdm
 from pprint import pprint
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
-from mis.models import Unet2d
+from mis.models import Unet2d, Unet2dNonLocal
 from mis.datasets import ASOCADataset
 from mis.settings import DEVICE, ASOCA_PATH
 from mis.loss import dice_loss
@@ -22,7 +23,6 @@ plt.rc("figure", figsize=(16, 8))
 plt.rc("font", size=13)
 
 torch.manual_seed(0)
-
 
 def train(
         model: nn.Module,
@@ -40,6 +40,7 @@ def train(
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     metrics = []
     min_loss = float("inf")
+    train_losses, val_losses = [], []
 
     for epoch in range(args.num_epochs):
 
@@ -68,7 +69,7 @@ def train(
         validation_loss = 0
         total_imgs, total_preds, total_masks = [], [], []
         with torch.no_grad():
-
+            
             for batch in tqdm(validation_dl):
 
                 images = batch["image"].to(DEVICE)
@@ -82,10 +83,24 @@ def train(
                 total_preds += preds.detach().cpu().tolist()
                 total_masks += masks.detach().cpu().tolist()
 
+        a = accuracy_score(total_masks, total_preds)
+        p, r, f, s = precision_recall_fscore_support(total_masks, total_preds)
+
+        train_loss = train_loss / len(train_dl)
+        validation_loss = validation_loss / len(validation_dl)
+
         metrics.append({
-            "validation_loss": validation_loss / len(validation_dl),
-            "train_loss": train_loss / len(train_dl)
+            "dice_val": validation_loss,
+            "dice_train": train_loss,
+            "accuracy": a,
+            "precision": p.tolist(),
+            "recall": r.tolist(),
+            "f1": f.tolist(),
+            "support": s.tolist()
         })
+
+        train_losses.append(train_loss)
+        val_losses.append(validation_loss)
 
         if validation_loss < min_loss:
             print("New min loss, saving model...")
@@ -117,9 +132,18 @@ def train(
                 ax[2].set_title("Prediction")
 
                 plt.savefig(epoch_dir / f"pred{idx}")
-                plt.clf()
+                plt.close()
 
         pprint(metrics[-1])
+
+    plt.title("Loss Per Epoch")
+    plt.xlabel("Epoch")
+    plt.ylabel("Dice Loss")
+    plt.plot(train_losses)
+    plt.plot(val_losses)
+    plt.legend(["Train Loss", "Validation Loss"])
+    plt.savefig(out_dir / "loss.png")
+    plt.close()
 
     return model, metrics
 
@@ -131,6 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=1e-03, type=float)
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_epochs", default=25, type=int)
+    parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
 
@@ -146,10 +171,10 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path("unet2d_training_results")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results")
     out_dir.mkdir(exist_ok=True)
 
-    model = Unet2d(1, 1)
+    model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)
 
     try:
         model.load_state_dict(torch.load(out_dir / "model"))

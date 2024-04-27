@@ -4,7 +4,6 @@ import numpy as np
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize
 from pathlib import Path
-from tqdm import tqdm
 
 class ASOCADataset(Dataset):
 
@@ -36,11 +35,11 @@ class ASOCADataset(Dataset):
         slice_idx = index % self.num_slices[patient_idx]
 
         if patient_idx < self.num_normal:
-            ctca_path = next(iter((self.n_path/"CTCA").glob(f"Normal_{patient_idx+1}*")))
-            anno_path = next(iter((self.n_path/"Annotations").glob(f"Normal_{patient_idx+1}*")))
+            ctca_path = self.n_path / "CTCA" /f"Normal_{patient_idx+1}.nrrd"
+            anno_path = self.n_path / "Annotations" / f"Normal_{patient_idx+1}.nrrd"
         else:
-            ctca_path = next(iter((self.d_path/"CTCA").glob(f"Diseased_{patient_idx%self.num_normal+1}*")))
-            anno_path = next(iter((self.d_path/"Annotations").glob(f"Diseased_{patient_idx%self.num_normal+1}*")))
+            ctca_path = self.d_path / "CTCA" / f"Diseased_{patient_idx%self.num_normal+1}.nrrd"
+            anno_path = self.d_path / "Annotations" / f"Diseased_{patient_idx%self.num_normal+1}.nrrd"
 
         ctca, _ = nrrd.read(ctca_path)
         ctca = ctca[:,:,slice_idx][None, :, :]
