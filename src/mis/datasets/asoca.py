@@ -25,7 +25,7 @@ class ASOCADataset(Dataset):
         self.data_dir = data_dir
         self.n_path = data_dir / "Normal"
         self.d_path = data_dir / "Diseased"
-        self.num_slices, self.num_normal = self.get_num_slices()
+        self.num_slices, self.num_normal, self.num_diseased = self.get_num_slices()
         self.slice_cumsums = np.asarray(self.num_slices).cumsum()
 
     def __len__(self):
@@ -62,15 +62,15 @@ class ASOCADataset(Dataset):
     def get_num_slices(self):
 
         num_slices = []
+        num_normal = len(list((self.n_path / "CTCA").glob("Normal*")))
+        num_diseased = len(list((self.d_path / "CTCA").glob("Diseased*")))
         
-        for f in tqdm((self.n_path / "CTCA").glob("Normal*")):
-            data, _ = nrrd.read(f)
+        for i in range(num_normal):
+            data, _ = nrrd.read(self.n_path / "CTCA" / f"Normal_{i+1}.nrrd")
             num_slices.append(data.shape[-1])
 
-        num_normal = len(num_slices)
-
-        for f in tqdm((self.d_path / "CTCA").glob("Diseased*")):
-            data, _ = nrrd.read(f)
+        for i in range(num_diseased):
+            data, _ = nrrd.read(self.d_path / "CTCA" / f"Diseased_{i+1}.nrrd")
             num_slices.append(data.shape[-1])
 
-        return num_slices, num_normal
+        return num_slices, num_normal, num_diseased

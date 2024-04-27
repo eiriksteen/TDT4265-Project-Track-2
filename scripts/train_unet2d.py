@@ -60,7 +60,6 @@ def train(
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-
             if i % 50 == 0:
                 pbar.set_description(f"Loss at step {i} = {train_loss / (i+1)}")
 
@@ -68,18 +67,14 @@ def train(
         model.eval()
         validation_loss = 0
         total_imgs, total_preds, total_masks = [], [], []
-
         with torch.no_grad():
 
             for batch in tqdm(validation_dl):
 
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
-
                 _, probs = model(images)
                 loss = dice_loss(masks, probs)
-
-                loss = dice_loss(masks.float(), probs)
                 validation_loss += loss.item()
 
                 preds = torch.where(probs >= 0.5, 1.0, 0.0)
@@ -116,9 +111,9 @@ def train(
 
                 ax[0].imshow(img.squeeze())
                 ax[0].set_title("Image")
-                ax[1].imshow(mask.argmax(axis=0))
+                ax[1].imshow(mask.squeeze())
                 ax[1].set_title("Ground Truth")
-                ax[2].imshow(pred.argmax(axis=0))
+                ax[2].imshow(pred.squeeze())
                 ax[2].set_title("Prediction")
 
                 plt.savefig(epoch_dir / f"pred{idx}")
