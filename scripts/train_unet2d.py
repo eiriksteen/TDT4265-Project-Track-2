@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
@@ -83,8 +82,10 @@ def train(
                 total_preds += preds.detach().cpu().tolist()
                 total_masks += masks.detach().cpu().tolist()
 
-        a = accuracy_score(total_masks, total_preds)
-        p, r, f, s = precision_recall_fscore_support(total_masks, total_preds)
+        total_masks_np = np.asarray(total_masks)
+        total_preds_np = np.asarray(total_preds)
+        a = accuracy_score(total_masks_np.flatten(), total_preds_np.flatten())
+        p, r, f, s = precision_recall_fscore_support(total_masks_np.flatten(), total_preds_np.flatten())
 
         train_loss = train_loss / len(train_dl)
         validation_loss = validation_loss / len(validation_dl)
@@ -114,9 +115,7 @@ def train(
                 json.dump(metrics[-1], f)
 
             total_imgs_np = np.asarray(total_imgs)
-            total_masks_np = np.asarray(total_masks)
-            total_preds_np = np.asarray(total_preds)
-            rand_idx = np.random.choice(len(total_preds), 25, replace=False)
+            rand_idx = np.random.choice(len(total_preds), 50, replace=False)
 
             for idx in rand_idx:
                 _, ax = plt.subplots(ncols=3)

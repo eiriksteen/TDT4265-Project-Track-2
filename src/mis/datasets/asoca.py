@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize
 from pathlib import Path
+from ..settings import ASOCA_PATH
 
 class ASOCADataset(Dataset):
 
@@ -13,7 +14,7 @@ class ASOCADataset(Dataset):
             two_dim: bool = True,
             to_torch: bool = True,
             norm: bool = True,
-            data_dir: Path = Path("/cluster/projects/vc/data/mic/open/Heart/ASOCA"),
+            data_dir: Path = ASOCA_PATH,
         ):
         super().__init__()
 
@@ -44,6 +45,7 @@ class ASOCADataset(Dataset):
         ctca, _ = nrrd.read(ctca_path)
         ctca = ctca[:,:,slice_idx][None, :, :]
         anno, _ = nrrd.read(anno_path)
+        anno = anno[:,:,slice_idx][None, :, :]
 
         if self.norm:
             ctca = ctca - ctca.min()
@@ -52,6 +54,7 @@ class ASOCADataset(Dataset):
         if self.to_torch:
             ctca = Resize((self.size, self.size))(torch.Tensor(ctca))
             anno = Resize((self.size, self.size))(torch.Tensor(anno))
+            anno = torch.where(anno > 0.0, 1.0, 0.0)
 
         return {
             "image": ctca,
