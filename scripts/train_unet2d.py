@@ -39,6 +39,7 @@ def train(
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     metrics = []
     min_loss = float("inf")
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor(870.0))
     train_losses, val_losses = [], []
 
     for epoch in range(args.num_epochs):
@@ -53,13 +54,15 @@ def train(
             images = batch["image"].to(DEVICE)
             masks = batch["mask"].to(DEVICE)
 
-            _, probs = model(images)
-            loss = dice_loss(masks, probs)
+            logits, _ = model(images)
+            # loss = dice_loss(masks, probs)
+            loss = loss_fn(masks, logits)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            
             if i % 50 == 0:
                 pbar.set_description(f"Loss at step {i} = {train_loss / (i+1)}")
 
@@ -73,8 +76,9 @@ def train(
 
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
-                _, probs = model(images)
-                loss = dice_loss(masks, probs)
+                logits, probs = model(images)
+                #loss = dice_loss(masks, probs)
+                loss = loss_fn(masks, logits)
                 validation_loss += loss.item()
 
                 preds = torch.where(probs >= 0.5, 1.0, 0.0)
