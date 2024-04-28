@@ -39,7 +39,7 @@ def train(
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     metrics = []
     min_loss = float("inf")
-    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor(870.0))
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([870.0]))
     train_losses, val_losses = [], []
 
     for epoch in range(args.num_epochs):
