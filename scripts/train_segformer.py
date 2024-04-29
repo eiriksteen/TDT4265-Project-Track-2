@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+from torch.autograd import Variable
 from tqdm import tqdm
 from pathlib import Path
 from mis import BratsDataset
@@ -33,6 +35,7 @@ def train_segformer(
     optimizer = torch.optim.AdamW(segformer.parameters(), lr=lr)
     min_val_loss = float("inf")
     out_dir.mkdir(exist_ok=True)
+    train_losses, val_losses = [], []
 
     for epoch in range(num_epochs):
 
@@ -52,20 +55,25 @@ def train_segformer(
             # Forward pass
             outputs = segformer(pixel_values=image, labels=seg)
             
-            # Upsample logits
-            logits = outputs.logits
-            upsampled_logits = nn.functional.interpolate(logits,
-                                                             size=seg.size()[-2:],
-                                                             mode='bilinear',
-                                                             align_corners=False)
+            # Loss does not decrease with dice loss
+            # # Upsample logits
+            # logits = outputs.logits
+            # upsampled_logits = nn.functional.interpolate(logits,
+            #                                                  size=seg.size()[-2:],
+            #                                                  mode='bilinear',
+            #                                                  align_corners=False)
 
-            # Predict masks
-            predicted_masks = upsampled_logits.argmax(dim=1)
-            masks_fi = seg.flatten().type(torch.uint8)
-            predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
+            # # Predict masks
+            # predicted_masks = upsampled_logits.argmax(dim=1)
+            # masks_fi = seg.flatten().type(torch.uint8)
+            # predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
             
-            # Calculate loss
-            loss = dice_loss(masks_fi, predicted_masks_fi)
+            # # Calculate loss
+            # loss = dice_loss(masks_fi, predicted_masks_fi)
+            # loss = Variable(loss, requires_grad=True)
+
+            loss = outputs.loss
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
@@ -75,33 +83,34 @@ def train_segformer(
 
         segformer.eval()
         val_loss = 0
-        # total_labels, total_preds = [], []
         with torch.no_grad():
-            for batch in tqdm(validation_loader):
-
+            for i, batch in enumerate(tqdm(validation_loader)):
+                
                 # Prepare data
-                image = batch["image"]
-                seg = batch["mask"]
+                image = batch["image"].to(DEVICE)
+                seg = batch["mask"].to(DEVICE)
                 image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
                 seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
                 # Forward pass
                 outputs = segformer(pixel_values=batch, labels=seg)
 
-                # Upsample logits
-                logits = outputs.logits
-                upsampled_logits = nn.functional.interpolate(logits,
-                                                             size=seg.size()[-2:],
-                                                             mode='bilinear',
-                                                             align_corners=False)
+                # Loss does not decrease with dice loss
+                # # Upsample logits
+                # logits = outputs.logits
+                # upsampled_logits = nn.functional.interpolate(logits,
+                #                                              size=seg.size()[-2:],
+                #                                              mode='bilinear',
+                #                                              align_corners=False)
 
-                # Predict masks
-                predicted_masks = upsampled_logits.argmax(dim=1)
-                masks_fi = seg.flatten().astype(np.uint8)
-                predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
+                # # Predict masks
+                # predicted_masks = upsampled_logits.argmax(dim=1)
+                # masks_fi = seg.flatten().astype(np.uint8)
+                # predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
 
-                # Calculate loss
-                loss = dice_loss(masks_fi, predicted_masks_fi)
+                # # Calculate loss
+                # loss = dice_loss(masks_fi, predicted_masks_fi)
+                loss = outputs.loss
                 val_loss += loss.item()
 
         metrics = {
@@ -110,40 +119,31 @@ def train_segformer(
         }
 
         if metrics["val_loss"] < min_val_loss:
+            print("New min loss, saving model...")
             min_val_loss = metrics["val_loss"]
             torch.save(segformer.state_dict(), out_dir / "segformer")
 
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
         pprint(metrics)
+    
+    plt.title("Loss Per Epoch")
+    plt.xlabel("Epoch")
+    # plt.ylabel("Dice Loss")
+    plt.ylabel("Cross Entropy Loss")
+    plt.plot(train_losses)
+    plt.plot(val_losses)
+    plt.legend(["Train Loss", "Validation Loss"])
+    plt.savefig(out_dir / "loss.png")
+    plt.close()
 
 
 if __name__ == "__main__":
 
-    # train_data = BratsDataset(
-    #     "train",
-    #     size=128,
-    #     normalize=True,
-    #     to_torch=True,
-    #     compression_params=[80, 8]
-    # )
-
-    # validation_data = BratsDataset(
-    #     "train",
-    #     size=128,
-    #     normalize=True,
-    #     to_torch=True,
-    #     compression_params=[80, 8]
-    # )
-    
-    # train_data = torch.rand((100, 3, 128, 128))
-    # validation_data = torch.rand((100, 3, 128, 128))
-    
-    # train_data = torch.randint(size=(100, 3, 128, 128), low=0, high=1)
-    # validation_data = torch.randint(size=(100, 3, 128, 128), low=0, high=1)
-
     config = SegformerConfig()
     segformer = SegformerForSemanticSegmentation(config=config)
     # segformer = SegformerModel(configuration)                           # Alternative
-    
     
     data = ASOCADataset(
         size=256,
@@ -153,10 +153,6 @@ if __name__ == "__main__":
         data_dir=ASOCA_PATH
     )
     train_data, validation_data = torch.utils.data.random_split(data, [0.8, 0.2])
-
-    print(train_data[0]["mask"].shape)
-    # x = train_data[0]["mask"].repeat(3, 1, 1)
-    # print(x.shape)
 
     # Update class labels
     id2label = {0: "background", 1: "artery"}
