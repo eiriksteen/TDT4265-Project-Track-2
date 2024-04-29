@@ -10,21 +10,22 @@ from pathlib import Path
 from mis import BratsDataset
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
 import huggingface_hub
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from pprint import pprint
 from mis.datasets import ASOCADataset
 from mis.settings import DEVICE, ASOCA_PATH
-from mis.loss import dice_loss
+from mis.loss import dice_loss, gdlv_loss, focal_loss
 
-def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
-    n = len(y_true.flatten())
-    return (1/n) * (torch.sum(1 - (2*y_true*y_pred + 1)/(y_true+y_pred + 1)))
+# def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+#     n = len(y_true.flatten())
+#     return (1/n) * (torch.sum(1 - (2*y_true*y_pred + 1)/(y_true+y_pred + 1)))
 
-def focal_loss(y_true: torch.Tensor, y_pred: torch.Tensor, gamma: float = 2.0):
+# def focal_loss(y_true: torch.Tensor, y_pred: torch.Tensor, gamma: float = 2.0):
 
-    logpt = F.binary_cross_entropy(y_pred, y_true)
-    pt = torch.e ** (-logpt)
+#     logpt = F.binary_cross_entropy(y_pred, y_true)
+#     pt = torch.e ** (-logpt)
 
-    return torch.mean((1 - pt)**gamma * logpt)
+#     return torch.mean((1 - pt)**gamma * logpt)
 
 
 def train_segformer(
@@ -39,7 +40,7 @@ def train_segformer(
 
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, drop_last=True)
     validation_loader = DataLoader(validation_data, batch_size=batch_size, shuffle=True, drop_last=True)
-    # loss_fn = dice_loss       # Call it manually
+    loss_fn = focal_loss
     optimizer = torch.optim.AdamW(segformer.parameters(), lr=lr)
     min_val_loss = float("inf")
     out_dir.mkdir(exist_ok=True)
@@ -64,7 +65,6 @@ def train_segformer(
                 # Forward pass
                 outputs = segformer(pixel_values=image, labels=seg)
                 
-                # Loss does not decrease with dice loss
                 # Upsample logits
                 logits = outputs.logits
                 upsampled_logits = nn.functional.interpolate(logits,
@@ -72,17 +72,15 @@ def train_segformer(
                                                                  mode='bilinear',
                                                                  align_corners=False)
 
-                # Predict masks
+                # Predict masks - Focal loss
                 predicted_masks = upsampled_logits.argmax(dim=1)
-                # masks_fi = seg.flatten().type(np.uint8)
-                # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)
                 masks_fi = seg.flatten().type(torch.FloatTensor)
                 predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
+                # masks_fi = seg.flatten().type(np.uint8)                               # For dice loss
+                # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)         # For dice loss
                 
                 # # Calculate loss - Focal loss
-                # loss = dice_loss(masks_fi, predicted_masks_fi)            Loss does not decrease with dice loss
-                # loss = Variable(loss, requires_grad=True)
-                loss = focal_loss(masks_fi, predicted_masks_fi)
+                loss = loss_fn(masks_fi, predicted_masks_fi)
                 loss = Variable(loss, requires_grad=True)
 
                 # loss = outputs.loss
@@ -112,7 +110,6 @@ def train_segformer(
                     # Forward pass
                     outputs = segformer(pixel_values=image, labels=seg)
 
-                    # Loss does not decrease with dice loss
                     # Upsample logits
                     logits = outputs.logits
                     upsampled_logits = nn.functional.interpolate(logits,
@@ -120,20 +117,16 @@ def train_segformer(
                                                                  mode='bilinear',
                                                                  align_corners=False)
 
-                    # Predict masks
+                    # Predict masks - Focal loss
                     predicted_masks = upsampled_logits.argmax(dim=1)
-                    # masks_fi = seg.flatten().type(np.uint8)
-                    # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)
                     masks_fi = seg.flatten().type(torch.FloatTensor)
                     predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
+                    # masks_fi = seg.flatten().type(np.uint8)                               # For dice loss
+                    # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)         # For dice loss
 
                     # # Calculate loss - Focal loss
-                    # loss = dice_loss(masks_fi, predicted_masks_fi)        Loss does not decrease with dice loss
-                    # loss = Variable(loss, requires_grad=True)
-                    loss = focal_loss(masks_fi, predicted_masks_fi)
+                    loss = loss_fn(masks_fi, predicted_masks_fi)
                     loss = Variable(loss, requires_grad=True)
-
-                    # loss = outputs.loss
                     val_loss += loss.item()
                 
                 else:
