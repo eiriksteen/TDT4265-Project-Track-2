@@ -2,14 +2,12 @@
 #SBATCH --account=ie-idi      # E.g. "ie-idi" if you belong to IDI
 #SBATCH --job-name=medseg
 #SBATCH --time=0-24:00:00         # format: D-HH:MM:SS
-
 #SBATCH --partition=GPUQ          # Asking for a GPU
 #SBATCH --gres=gpu:1             # Setting the number of GPUs to 1
-#SBATCH --mem=16G                 # Asking for 16GB RAM
+#SBATCH --mem=32G                 # Asking for 16GB RAM
 #SBATCH --nodes=1
 #SBATCH --output=output.txt      # Specifying 'stdout'
 #SBATCH --error=output.err        # Specifying 'stderr'
-
 #SBATCH --mail-user=eirikdst@stud.ntnu.no
 #SBATCH --mail-type=ALL
 
@@ -25,4 +23,4 @@ module purge
 # Running your python file
 module load Anaconda3/2023.09-0
 conda activate cv
-python scripts/train_unet2d.py
+python scripts/train_unet2d.py --loss=$1

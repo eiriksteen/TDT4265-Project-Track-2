@@ -16,8 +16,7 @@ class BratsDataset(Dataset):
             data_dir: Path = BRATS_PATH,
             size: int = 128,
             normalize=True,
-            to_torch=True,
-            compression_params=None # [slice_num, offset]
+            to_torch=True
     ) -> None:
         super().__init__()
 
@@ -31,34 +30,33 @@ class BratsDataset(Dataset):
 
         self.data_dir = data_dir
         self.size = size
-        self.compression_params = compression_params
-
-        if compression_params is not None:
-            self.slice_num, self.offset = compression_params
-
         self.normalize = normalize
         self.to_torch = to_torch
 
     def __len__(self) -> int:
-        return len(list(self.data_dir.glob("BraTS20*")))
+        return 155 * len(list(self.data_dir.glob("BraTS20*")))
 
     def __getitem__(self, index):
 
-        patient_dir = self.data_dir / \
-            list(self.data_dir.glob("BraTS20*"))[index]
+        dir_idx = index // 155
+        slice_num = index % 155
 
+        patient_dir = self.data_dir / \
+            list(self.data_dir.glob("BraTS20*"))[dir_idx]
+        
         image_path = next(patient_dir.glob("*flair*"))
-        seg_path = next(patient_dir.glob("*seg*"))
+        
+        try:
+            seg_path = next(patient_dir.glob("*seg*"))
+        except StopIteration:
+            seg_path = next(patient_dir.glob("*Seg*"))
+
         t1_path = next(patient_dir.glob("*t1.*"))
         t1ce_path = next(patient_dir.glob("*t1ce*"))
         t2_path = next(patient_dir.glob("*t2*"))
 
         paths = [image_path, seg_path, t1_path, t1ce_path, t2_path]
-
-        images = [nib.load(p).get_fdata().astype(np.float32) for p in paths]
-
-        if self.compression_params is not None:
-            images = [i[:,:,self.slice_num-self.offset:self.slice_num+self.offset] for i in images]
+        images = [nib.load(p).get_fdata()[:,:,slice_num][:,:,None].astype(np.float32) for p in paths]
         
         if self.normalize:
             mask = images[1]
@@ -68,13 +66,12 @@ class BratsDataset(Dataset):
         if self.to_torch:
             images = [i.transpose(2,0,1) for i in images]    
             images = [Resize((self.size, self.size))(torch.from_numpy(i)) for i in images]
-            images = [i[None,:,:,:] for i in images]
 
         image, seg, t1, t1ce, t2 = images
 
         return {
             "image": image,
-            "seg": seg.long(),
+            "mask": seg,
             "t1": t1,
             "t1ce": t1ce,
             "t2": t2
