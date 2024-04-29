@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from pathlib import Path
@@ -7,6 +8,9 @@ from mis import BratsDataset
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
 import huggingface_hub
 from pprint import pprint
+from mis.datasets import ASOCADataset
+from mis.settings import DEVICE, ASOCA_PATH
+from mis.loss import dice_loss
 
 def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     n = len(y_true.flatten())
@@ -23,8 +27,8 @@ def train_segformer(
         out_dir = Path("segformer_training_results")
     ):
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-    validation_loader = DataLoader(validation_data, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, drop_last=True)
+    validation_loader = DataLoader(validation_data, batch_size=batch_size, shuffle=True, drop_last=True)
     # loss_fn = dice_loss       # Call it manually
     optimizer = torch.optim.AdamW(segformer.parameters(), lr=lr)
     min_val_loss = float("inf")
@@ -39,23 +43,38 @@ def train_segformer(
         for batch in tqdm(train_loader):
 
             # Define test labels
-            seg = torch.rand((batch_size, 3, 128, 128))
-            # seg = torch.randint(size=(batch_size, 3, 128, 128), low=0, high=1)
-            # print(batch.shape)
-            # print(seg.shape)
+            image = batch["image"].to(DEVICE)
+            seg = batch["mask"].to(DEVICE)
+            
+            # Prepare data
+            image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
+            seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
-            outputs = segformer(batch)
-            # outputs = segformer(pixel_values=batch, labels=seg)
-            # print(outputs)
-            # loss = outputs.loss
-            # print(loss)
-            # logits = outputs.logits
-            # print(logits.shape)
+            # outputs = segformer(batch)
+            outputs = segformer(pixel_values=image, labels=seg)
+            loss = outputs.loss
+            logits = outputs.logits
 
             # loss = loss_fn(outputs, seg)
-            # print(outputs.logits.shape, seg.shape)
-            loss = dice_loss(outputs.logits, seg)
+            print(outputs.logits.shape, seg.shape)
+            # loss = dice_loss(outputs.logits, seg)
             # loss = segformer(batch, seg).loss
+            upsampled_logits = nn.functional.interpolate(logits,
+                                                             size=seg.size()[-2:],
+                                                             mode='bilinear',
+                                                             align_corners=False)
+
+            predicted_masks = upsampled_logits.argmax(dim=1)
+
+            masks_fi = seg.flatten().type(torch.uint8)
+            predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
+
+
+            dice_score = dice_loss(masks_fi, predicted_masks_fi)
+            
+            print("Loss: ", loss.item())
+            print("Dice loss: ", dice_score.item())
+            
 
             loss.backward()
 
@@ -71,12 +90,26 @@ def train_segformer(
             for batch in tqdm(validation_loader):
 
                 # Define test labels
-                seg = torch.rand((batch_size, 3, 128, 128))
+                image = batch["image"]
+                seg = batch["mask"]
+                
 
-                outputs = segformer(batch)
+                outputs = segformer(pixel_values=batch, labels=seg)
+                loss = outputs.loss
+                logits = outputs.logits
 
-                # loss = loss_fn(outputs, seg)
-                loss = dice_loss(outputs, seg)
+                upsampled_logits = nn.functional.interpolate(logits,
+                                                             size=seg.size()[-2:],
+                                                             mode='bilinear',
+                                                             align_corners=False)
+
+                predicted_masks = upsampled_logits.argmax(dim=1)
+
+                masks_fi = seg.flatten().astype(np.uint8)
+                predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
+
+                dice_score = 1 - dice_loss(masks_fi, predicted_masks_fi)
+                # loss = dice_loss(outputs, seg)
 
                 val_loss += loss.item()
 
@@ -110,8 +143,8 @@ if __name__ == "__main__":
     #     compression_params=[80, 8]
     # )
     
-    train_data = torch.rand((100, 3, 128, 128))
-    validation_data = torch.rand((100, 3, 128, 128))
+    # train_data = torch.rand((100, 3, 128, 128))
+    # validation_data = torch.rand((100, 3, 128, 128))
     
     # train_data = torch.randint(size=(100, 3, 128, 128), low=0, high=1)
     # validation_data = torch.randint(size=(100, 3, 128, 128), low=0, high=1)
@@ -120,6 +153,19 @@ if __name__ == "__main__":
     segformer = SegformerForSemanticSegmentation(config=config)
     # segformer = SegformerModel(configuration)                           # Alternative
     
+    
+    data = ASOCADataset(
+        size=256,
+        two_dim=True,
+        to_torch=True,
+        norm=True,
+        data_dir=ASOCA_PATH
+    )
+    train_data, validation_data = torch.utils.data.random_split(data, [0.8, 0.2])
+
+    print(train_data[0]["mask"].shape)
+    # x = train_data[0]["mask"].repeat(3, 1, 1)
+    # print(x.shape)
 
     # Update class labels
     id2label = {0: "background", 1: "artery"}
@@ -128,11 +174,11 @@ if __name__ == "__main__":
     segformer.config.label2id = label2id
     
     # Update image size
-    image_size = 128
+    image_size = 256
     segformer.config.image_size = image_size
     
     # Update number of channels
-    num_channels = 3
+    num_channels = 1
     segformer.config.num_channels = num_channels
 
     train_segformer(
