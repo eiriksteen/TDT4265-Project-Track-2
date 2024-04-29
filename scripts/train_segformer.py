@@ -46,72 +46,84 @@ def train_segformer(
         pbar = tqdm(train_loader)
         for i, batch in enumerate(pbar):
 
-            # Prepare data
-            image = batch["image"].to(DEVICE)
-            seg = batch["mask"].to(DEVICE)
-            image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
-            seg = seg.squeeze(dim=1).type(torch.LongTensor)
+            if i < 2:
 
-            # Forward pass
-            outputs = segformer(pixel_values=image, labels=seg)
+                # Prepare data
+                image = batch["image"]
+                seg = batch["mask"]
+                image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
+                seg = seg.squeeze(dim=1).type(torch.LongTensor)
+
+                # Forward pass
+                outputs = segformer(pixel_values=image, labels=seg)
+                
+                # Loss does not decrease with dice loss
+                # # Upsample logits
+                # logits = outputs.logits
+                # upsampled_logits = nn.functional.interpolate(logits,
+                #                                                  size=seg.size()[-2:],
+                #                                                  mode='bilinear',
+                #                                                  align_corners=False)
+
+                # # Predict masks
+                # predicted_masks = upsampled_logits.argmax(dim=1)
+                # masks_fi = seg.flatten().type(torch.uint8)
+                # predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
+                
+                # # Calculate loss
+                # loss = dice_loss(masks_fi, predicted_masks_fi)
+                # loss = Variable(loss, requires_grad=True)
+
+                loss = outputs.loss
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
             
-            # Loss does not decrease with dice loss
-            # # Upsample logits
-            # logits = outputs.logits
-            # upsampled_logits = nn.functional.interpolate(logits,
-            #                                                  size=seg.size()[-2:],
-            #                                                  mode='bilinear',
-            #                                                  align_corners=False)
-
-            # # Predict masks
-            # predicted_masks = upsampled_logits.argmax(dim=1)
-            # masks_fi = seg.flatten().type(torch.uint8)
-            # predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
-            
-            # # Calculate loss
-            # loss = dice_loss(masks_fi, predicted_masks_fi)
-            # loss = Variable(loss, requires_grad=True)
-
-            loss = outputs.loss
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-        
-            if i % 2 == 0:
-                pbar.set_description(f"Training loss at step {i} = {train_loss / (i+1)}")
+                if i % 2 == 0:
+                    pbar.set_description(f"Training loss at step {i} = {train_loss / (i+1)}")
+                    
+            else:
+                break
 
         segformer.eval()
         val_loss = 0
         with torch.no_grad():
             for i, batch in enumerate(tqdm(validation_loader)):
                 
-                # Prepare data
-                image = batch["image"].to(DEVICE)
-                seg = batch["mask"].to(DEVICE)
-                image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
-                seg = seg.squeeze(dim=1).type(torch.LongTensor)
+                if i < 2:
+                    
+                    # Prepare data
+                    image = batch["image"]
+                    seg = batch["mask"]
+                    image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
+                    seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
-                # Forward pass
-                outputs = segformer(pixel_values=batch, labels=seg)
+                    # Forward pass
+                    outputs = segformer(pixel_values=image, labels=seg)
 
-                # Loss does not decrease with dice loss
-                # # Upsample logits
-                # logits = outputs.logits
-                # upsampled_logits = nn.functional.interpolate(logits,
-                #                                              size=seg.size()[-2:],
-                #                                              mode='bilinear',
-                #                                              align_corners=False)
+                    # Loss does not decrease with dice loss
+                    # # Upsample logits
+                    # logits = outputs.logits
+                    # upsampled_logits = nn.functional.interpolate(logits,
+                    #                                              size=seg.size()[-2:],
+                    #                                              mode='bilinear',
+                    #                                              align_corners=False)
 
-                # # Predict masks
-                # predicted_masks = upsampled_logits.argmax(dim=1)
-                # masks_fi = seg.flatten().astype(np.uint8)
-                # predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
+                    # # Predict masks
+                    # predicted_masks = upsampled_logits.argmax(dim=1)
+                    # masks_fi = seg.flatten().astype(np.uint8)
+                    # predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
 
-                # # Calculate loss
-                # loss = dice_loss(masks_fi, predicted_masks_fi)
-                loss = outputs.loss
-                val_loss += loss.item()
+                    # # Calculate loss
+                    # loss = dice_loss(masks_fi, predicted_masks_fi)
+                    # loss = Variable(loss, requires_grad=True)
+                    
+                    loss = outputs.loss
+                    val_loss += loss.item()
+                
+                else:
+                    break
 
         metrics = {
             "train_loss": train_loss / len(train_loader),
