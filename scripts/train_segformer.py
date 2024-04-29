@@ -21,9 +21,6 @@ def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
 def focal_loss(y_true: torch.Tensor, y_pred: torch.Tensor, gamma: float = 2.0):
 
-    print(type(y_true), type(y_pred))
-    print(y_true.type(), y_pred.type())
-
     logpt = F.binary_cross_entropy(y_pred, y_true)
     pt = torch.e ** (-logpt)
 
@@ -62,7 +59,6 @@ def train_segformer(
                 # Prepare data
                 image = batch["image"]
                 seg = batch["mask"]
-                image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
                 seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
                 # Forward pass
@@ -83,8 +79,8 @@ def train_segformer(
                 masks_fi = seg.flatten().type(torch.FloatTensor)
                 predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
                 
-                # # Calculate loss
-                # loss = dice_loss(masks_fi, predicted_masks_fi)
+                # # Calculate loss - Focal loss
+                # loss = dice_loss(masks_fi, predicted_masks_fi)            Loss does not decrease with dice loss
                 # loss = Variable(loss, requires_grad=True)
                 loss = focal_loss(masks_fi, predicted_masks_fi)
                 loss = Variable(loss, requires_grad=True)
@@ -111,7 +107,6 @@ def train_segformer(
                     # Prepare data
                     image = batch["image"]
                     seg = batch["mask"]
-                    image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
                     seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
                     # Forward pass
@@ -132,8 +127,8 @@ def train_segformer(
                     masks_fi = seg.flatten().type(torch.FloatTensor)
                     predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
 
-                    # # Calculate loss
-                    # loss = dice_loss(masks_fi, predicted_masks_fi)
+                    # # Calculate loss - Focal loss
+                    # loss = dice_loss(masks_fi, predicted_masks_fi)        Loss does not decrease with dice loss
                     # loss = Variable(loss, requires_grad=True)
                     loss = focal_loss(masks_fi, predicted_masks_fi)
                     loss = Variable(loss, requires_grad=True)
@@ -162,7 +157,8 @@ def train_segformer(
     plt.title("Loss Per Epoch")
     plt.xlabel("Epoch")
     # plt.ylabel("Dice Loss")
-    plt.ylabel("Cross Entropy Loss")
+    # plt.ylabel("Cross Entropy Loss")
+    plt.ylabel("Focal Loss")
     plt.plot(train_losses)
     plt.plot(val_losses)
     plt.legend(["Train Loss", "Validation Loss"])
@@ -172,10 +168,21 @@ def train_segformer(
 
 if __name__ == "__main__":
 
+    # Update config
+    semantic_loss_ignore_index = 0      # Background class
+    num_channels = 1
+
     config = SegformerConfig()
+    config.id2label = {0: "background", 1: "artery"}
+    config.label2id = {"background": 0, "artery": 1}
+    config.semantic_loss_ignore_index = semantic_loss_ignore_index
+    config.num_channels = num_channels
+    
+    # Get model
     segformer = SegformerForSemanticSegmentation(config=config)
     # segformer = SegformerModel(configuration)                           # Alternative
     
+    # Load data
     data = ASOCADataset(
         size=256,
         two_dim=True,
@@ -184,21 +191,12 @@ if __name__ == "__main__":
         data_dir=ASOCA_PATH
     )
     train_data, validation_data = torch.utils.data.random_split(data, [0.8, 0.2])
-
-    # Update class labels
-    id2label = {0: "background", 1: "artery"}
-    label2id = {"background": 0, "artery": 1}
-    segformer.config.id2label = id2label
-    segformer.config.label2id = label2id
     
-    # Update image size
+    # Ensure image size is correct
     image_size = 256
     segformer.config.image_size = image_size
     
-    # Update number of channels
-    num_channels = 1
-    segformer.config.num_channels = num_channels
-
+    
     train_segformer(
         segformer, 
         train_data, 
