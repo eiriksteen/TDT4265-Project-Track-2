@@ -9,7 +9,11 @@ class Swish(nn.Module):
 
 class ResnetBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(
+            self, 
+            in_channels, 
+            out_channels
+            ):
         super(ResnetBlock, self).__init__()
 
         self.in_channels = in_channels
@@ -31,7 +35,8 @@ class ResnetBlock(nn.Module):
     def forward(self, x, block_output=None):
 
         if block_output is not None:
-            x += block_output
+            x = torch.cat((x, block_output), dim=1)
+            # x += block_output
 
         logits = self.block(x)
 
@@ -75,15 +80,15 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self.network = nn.ModuleList([
-            ResnetBlock(512, 512),
+            ResnetBlock(512*2, 512),
             NonLocalBlock(512) if non_local else nn.Identity(),
             nn.ConvTranspose2d(512, 256, 2, 2),
-            ResnetBlock(256, 256),
+            ResnetBlock(256*2, 256),
             NonLocalBlock(256) if non_local else nn.Identity(),
             nn.ConvTranspose2d(256, 128, 2, 2),
-            ResnetBlock(128, 128),
+            ResnetBlock(128*2, 128),
             nn.ConvTranspose2d(128, 64, 2, 2),
-            ResnetBlock(64, 64),
+            ResnetBlock(64*2, 64),
             nn.Conv2d(64, out_channels, 1, 1),
         ])
 

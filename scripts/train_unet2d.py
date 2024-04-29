@@ -183,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_epochs", default=25, type=int)
     parser.add_argument("--loss", default="dice", type=str)
+    parser.add_argument("--dataset", default="asoca", type=str)
     parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
@@ -190,24 +191,29 @@ if __name__ == "__main__":
     losses = ["dice", "focal"]
     if args.loss not in losses:
         raise ValueError(f"Loss must not be in {losses}")
+    
+    dsets = ["asoca", "brats"]
+    if args.dataset not in dsets:
+        raise ValueError(f"Dset must be in {dsets}")
 
-    data = ASOCADataset(
-        size=256,
-        two_dim=True,
-        to_torch=True,
-        norm=True,
-        data_dir=ASOCA_PATH
-    )
-
-    # data = BratsDataset(
-    #     "train"
-    # )
+    if args.dataset == "asoca":
+        data = ASOCADataset(
+            size=256,
+            two_dim=True,
+            to_torch=True,
+            norm=True,
+            data_dir=ASOCA_PATH
+        )
+    else:
+        data = BratsDataset(
+            "train"
+        )
 
     train_data, val_data = torch.utils.data.random_split(data, [0.8, 0.2])
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}_test")
     out_dir.mkdir(exist_ok=True)
 
     model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)
