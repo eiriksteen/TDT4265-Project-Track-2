@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 from mis.models import Unet2d, Unet2dNonLocal
 from mis.datasets import ASOCADataset
 from mis.settings import DEVICE, ASOCA_PATH
-from mis.loss import dice_loss
+from mis.loss import dice_loss, gdlv_loss, focal_loss
 
 sns.set_style("darkgrid")
 plt.rc("figure", figsize=(16, 8))
@@ -39,13 +39,14 @@ def train(
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     metrics = []
     min_loss = float("inf")
-    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([870.0]).to(DEVICE))
+    loss_fn = dice_loss if args.loss == "dice" else focal_loss
+    # loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([0.01]).to(DEVICE))
     train_losses, val_losses = [], []
 
     for epoch in range(args.num_epochs):
 
         print(f"STARTING EPOCH {epoch+1}")
-        train_loss = 0
+        train_loss, train_dice = 0, 0
         model.train()
 
         pbar = tqdm(train_dl)
@@ -54,37 +55,42 @@ def train(
             images = batch["image"].to(DEVICE)
             masks = batch["mask"].to(DEVICE)
 
-            logits, _ = model(images)
-            # loss = dice_loss(masks, probs)
-            loss = loss_fn(masks, logits)
+            _, probs = model(images)
+            # loss = focal_loss(masks, probs)
+            loss = loss_fn(masks, probs)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            train_dice += 1 - dice_loss(masks, probs).item()
             
-            if i % 50 == 0:
-                pbar.set_description(f"Loss at step {i} = {train_loss / (i+1)}")
+            if i % 10 == 0:
+                pbar.set_description(f"(Loss, Dice) step {i} = ({train_loss / (i+1)}, {train_dice / (i+1)})")
 
         print("RUNNING VALIDATION")
         model.eval()
-        validation_loss = 0
+        val_loss, val_dice  = 0, 0
         total_imgs, total_preds, total_masks = [], [], []
         with torch.no_grad():
-            
-            for batch in tqdm(validation_dl):
+            pbar = tqdm(validation_dl)
+            for i, batch in enumerate(pbar):
 
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
-                logits, probs = model(images)
-                #loss = dice_loss(masks, probs)
-                loss = loss_fn(masks, logits)
-                validation_loss += loss.item()
+                _, probs = model(images)
+                # loss = focal_loss(masks, probs)
+                loss = loss_fn(masks, probs)
+                val_loss += loss.item()
+                val_dice += 1 - dice_loss(masks, probs).item()
 
                 preds = torch.where(probs >= 0.5, 1.0, 0.0)
                 total_imgs += images.detach().cpu().tolist()
                 total_preds += preds.detach().cpu().tolist()
                 total_masks += masks.detach().cpu().tolist()
+
+                if i % 10 == 0:
+                    pbar.set_description(f"(Loss, Dice) step {i} = ({val_loss / (i+1)}, {val_dice / (i+1)})")
 
         total_masks_np = np.asarray(total_masks)
         total_preds_np = np.asarray(total_preds)
@@ -92,11 +98,15 @@ def train(
         p, r, f, s = precision_recall_fscore_support(total_masks_np.flatten(), total_preds_np.flatten())
 
         train_loss = train_loss / len(train_dl)
-        validation_loss = validation_loss / len(validation_dl)
+        val_loss = val_loss / len(validation_dl)
+        train_dice = train_dice / len(train_dl)
+        val_dice = val_dice / len(validation_dl)
 
         metrics.append({
-            "dice_val": validation_loss,
-            "dice_train": train_loss,
+            "val_loss": val_loss,
+            "train_loss": train_loss,
+            "val_dice": val_dice,
+            "train_dice": train_dice,
             "accuracy": a,
             "precision": p.tolist(),
             "recall": r.tolist(),
@@ -105,12 +115,12 @@ def train(
         })
 
         train_losses.append(train_loss)
-        val_losses.append(validation_loss)
+        val_losses.append(val_loss)
 
-        if validation_loss < min_loss:
+        if val_loss < min_loss:
             print("New min loss, saving model...")
             torch.save(model.state_dict(), out_dir / "model")
-            min_loss = validation_loss
+            min_loss = val_loss
 
             epoch_dir = out_dir / f"epoch{epoch+1}"
             epoch_dir.mkdir(exist_ok=True)
@@ -141,7 +151,7 @@ def train(
 
     plt.title("Loss Per Epoch")
     plt.xlabel("Epoch")
-    plt.ylabel("Dice Loss")
+    plt.ylabel("Loss")
     plt.plot(train_losses)
     plt.plot(val_losses)
     plt.legend(["Train Loss", "Validation Loss"])
@@ -158,9 +168,14 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=1e-03, type=float)
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_epochs", default=25, type=int)
+    parser.add_argument("--loss", default="dice", type=str)
     parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
+
+    losses = ["dice", "focal"]
+    if args.loss not in losses:
+        raise ValueError(f"Loss must not be in {losses}")
 
     data = ASOCADataset(
         size=256,
@@ -174,7 +189,7 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_test")
     out_dir.mkdir(exist_ok=True)
 
     model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)

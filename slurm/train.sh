@@ -23,4 +23,4 @@ module purge
 # Running your python file
 module load Anaconda3/2023.09-0
 conda activate cv
-python scripts/train_unet2d.py
+python scripts/train_unet2d.py --loss=$1
