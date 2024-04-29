@@ -179,9 +179,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--lr", default=1e-03, type=float)
+    parser.add_argument("--lr", default=1e-04, type=float)
     parser.add_argument("--batch_size", default=8, type=int)
-    parser.add_argument("--num_epochs", default=25, type=int)
+    parser.add_argument("--num_epochs", default=10, type=int)
     parser.add_argument("--loss", default="dice", type=str)
     parser.add_argument("--dataset", default="asoca", type=str)
     parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}_test")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}_{args.dataset}")
     out_dir.mkdir(exist_ok=True)
 
     model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)

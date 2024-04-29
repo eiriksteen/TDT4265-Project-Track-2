@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
-    return 1 - (2 * (y_true*y_pred).sum() + 1) / (y_true.sum()+y_pred.sum() + 1)
+    return 1 - (2 * (y_true*y_pred).sum() + 1) / ((y_true**2).sum()+(y_pred**2).sum() + 1)
 
 def gdlv_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
