@@ -13,7 +13,7 @@ from pprint import pprint
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from mis.models import Unet2d, Unet2dNonLocal
-from mis.datasets import ASOCADataset
+from mis.datasets import ASOCADataset, BratsDataset
 from mis.settings import DEVICE, ASOCA_PATH
 from mis.loss import dice_loss, gdlv_loss, focal_loss
 
@@ -42,6 +42,7 @@ def train(
     loss_fn = dice_loss if args.loss == "dice" else focal_loss
     # loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([0.01]).to(DEVICE))
     train_losses, val_losses = [], []
+    train_dices, val_dices = [], []
 
     for epoch in range(args.num_epochs):
 
@@ -58,6 +59,8 @@ def train(
             _, probs = model(images)
             # loss = focal_loss(masks, probs)
             loss = loss_fn(masks, probs)
+
+            print(torch.where(probs > 0.5, 1,0).count_nonzero())
 
             optimizer.zero_grad()
             loss.backward()
@@ -116,6 +119,8 @@ def train(
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
+        train_dices.append(train_dice)
+        val_dices.append(val_dice)
 
         if val_loss < min_loss:
             print("New min loss, saving model...")
@@ -158,6 +163,15 @@ def train(
     plt.savefig(out_dir / "loss.png")
     plt.close()
 
+    plt.title("Dice Per Epoch")
+    plt.xlabel("Epoch")
+    plt.ylabel("Dice")
+    plt.plot(train_dices)
+    plt.plot(val_dices)
+    plt.legend(["Train Dice", "Validation Dice"])
+    plt.savefig(out_dir / "dice.png")
+    plt.close()
+
     return model, metrics
 
 
@@ -185,11 +199,15 @@ if __name__ == "__main__":
         data_dir=ASOCA_PATH
     )
 
+    # data = BratsDataset(
+    #     "train"
+    # )
+
     train_data, val_data = torch.utils.data.random_split(data, [0.8, 0.2])
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_test")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}")
     out_dir.mkdir(exist_ok=True)
 
     model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)

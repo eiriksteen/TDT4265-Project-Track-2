@@ -3,10 +3,7 @@ import torch.nn.functional as F
 
 def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
-    ytf = y_true.flatten(start_dim=1)
-    ypf = y_pred.flatten(start_dim=1)
-
-    return 1 - (2 * (ytf*ypf).sum() + 1) / (ytf.sum() + ypf.sum() + 1)
+    return 1 - (2 * (y_true*y_pred).sum() + 1) / (y_true.sum()+y_pred.sum() + 1)
 
 def gdlv_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
@@ -29,9 +26,12 @@ def gdlv_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     return gdl
 
 
-def focal_loss(y_true: torch.Tensor, y_pred: torch.Tensor, gamma: float = 5.0):
+def focal_loss(y_true: torch.Tensor, y_pred: torch.Tensor, gamma: float = 2.0):
 
-    return -torch.mean(y_true*(1-y_pred)**gamma*torch.log(y_pred) + (1-y_true)*y_pred**gamma*torch.log(1-y_pred))
+    logpt = F.binary_cross_entropy(y_pred, y_true)
+    pt = torch.e ** (-logpt)
+
+    return torch.mean((1 - pt)**gamma * logpt)
 
 # def soft_dice(y_true: torch.Tensor, y_pred: torch.Tensor):
 
