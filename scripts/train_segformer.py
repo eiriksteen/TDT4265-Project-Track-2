@@ -40,48 +40,38 @@ def train_segformer(
         segformer.train()
         train_loss = 0
 
-        for batch in tqdm(train_loader):
+        pbar = tqdm(train_loader)
+        for i, batch in enumerate(pbar):
 
-            # Define test labels
+            # Prepare data
             image = batch["image"].to(DEVICE)
             seg = batch["mask"].to(DEVICE)
-            
-            # Prepare data
             image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
             seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
-            # outputs = segformer(batch)
+            # Forward pass
             outputs = segformer(pixel_values=image, labels=seg)
-            loss = outputs.loss
+            
+            # Upsample logits
             logits = outputs.logits
-
-            # loss = loss_fn(outputs, seg)
-            print(outputs.logits.shape, seg.shape)
-            # loss = dice_loss(outputs.logits, seg)
-            # loss = segformer(batch, seg).loss
             upsampled_logits = nn.functional.interpolate(logits,
                                                              size=seg.size()[-2:],
                                                              mode='bilinear',
                                                              align_corners=False)
 
+            # Predict masks
             predicted_masks = upsampled_logits.argmax(dim=1)
-
             masks_fi = seg.flatten().type(torch.uint8)
             predicted_masks_fi = predicted_masks.flatten().type(torch.uint8)
-
-
-            dice_score = dice_loss(masks_fi, predicted_masks_fi)
             
-            print("Loss: ", loss.item())
-            print("Dice loss: ", dice_score.item())
-            
-
+            # Calculate loss
+            loss = dice_loss(masks_fi, predicted_masks_fi)
             loss.backward()
-
             optimizer.step()
-
             train_loss += loss.item()
         
+            if i % 2 == 0:
+                pbar.set_description(f"Training loss at step {i} = {train_loss / (i+1)}")
 
         segformer.eval()
         val_loss = 0
@@ -89,28 +79,29 @@ def train_segformer(
         with torch.no_grad():
             for batch in tqdm(validation_loader):
 
-                # Define test labels
+                # Prepare data
                 image = batch["image"]
                 seg = batch["mask"]
-                
+                image = image.repeat(1, 3, 1, 1)                        # Repeat image 3 times to match number of channels required by Segformer
+                seg = seg.squeeze(dim=1).type(torch.LongTensor)
 
+                # Forward pass
                 outputs = segformer(pixel_values=batch, labels=seg)
-                loss = outputs.loss
-                logits = outputs.logits
 
+                # Upsample logits
+                logits = outputs.logits
                 upsampled_logits = nn.functional.interpolate(logits,
                                                              size=seg.size()[-2:],
                                                              mode='bilinear',
                                                              align_corners=False)
 
+                # Predict masks
                 predicted_masks = upsampled_logits.argmax(dim=1)
-
                 masks_fi = seg.flatten().astype(np.uint8)
                 predicted_masks_fi = predicted_masks.flatten().astype(np.uint8)
 
-                dice_score = 1 - dice_loss(masks_fi, predicted_masks_fi)
-                # loss = dice_loss(outputs, seg)
-
+                # Calculate loss
+                loss = dice_loss(masks_fi, predicted_masks_fi)
                 val_loss += loss.item()
 
         metrics = {
