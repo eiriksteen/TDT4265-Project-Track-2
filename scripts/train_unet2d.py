@@ -39,8 +39,7 @@ def train(
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     metrics = []
     min_loss = float("inf")
-    loss_fn = dice_loss if args.loss == "dice" else focal_loss
-    # loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([0.01]).to(DEVICE))
+    loss_fn = dice_loss if args.loss == "dice" else gdlv_loss if args.loss=="gdlv" else focal_loss
     train_losses, val_losses = [], []
     train_dices, val_dices = [], []
 
@@ -57,10 +56,7 @@ def train(
             masks = batch["mask"].to(DEVICE)
 
             _, probs = model(images)
-            # loss = focal_loss(masks, probs)
             loss = loss_fn(masks, probs)
-
-            print(torch.where(probs > 0.5, 1,0).count_nonzero())
 
             optimizer.zero_grad()
             loss.backward()
@@ -82,7 +78,6 @@ def train(
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
                 _, probs = model(images)
-                # loss = focal_loss(masks, probs)
                 loss = loss_fn(masks, probs)
                 val_loss += loss.item()
                 val_dice += 1 - dice_loss(masks, probs).item()
@@ -188,7 +183,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    losses = ["dice", "focal"]
+    losses = ["dice", "focal", "gdlv"]
     if args.loss not in losses:
         raise ValueError(f"Loss must not be in {losses}")
     

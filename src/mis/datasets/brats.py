@@ -69,6 +69,8 @@ class BratsDataset(Dataset):
 
         image, seg, t1, t1ce, t2 = images
 
+        seg = torch.where(seg>0,1,0).float()
+
         return {
             "image": image,
             "mask": seg,
