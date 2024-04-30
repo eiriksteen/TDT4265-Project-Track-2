@@ -45,17 +45,18 @@ def train_segformer(
     out_dir.mkdir(exist_ok=True)
     metrics = []
     train_losses, val_losses = [], []
+    train_dices, val_dices = [], []
 
     for epoch in range(num_epochs):
 
         print(f"STARTING EPOCH {epoch+1}")
         segformer.train()
-        train_loss = 0
-
+        train_loss, train_dice = 0, 0
+        
         pbar = tqdm(train_loader)
         for i, batch in enumerate(pbar):
 
-            if i < 4:
+            if i < 7:
 
                 # Prepare data
                 image = batch["image"].to(DEVICE)
@@ -72,20 +73,18 @@ def train_segformer(
                                                                  mode='bilinear',
                                                                  align_corners=False)
                 
-                # Predict masks - Dice loss
-                predicted_masks = upsampled_logits.squeeze(dim=1)
-                # predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[0]
-                masks_fi = seg.flatten().type(torch.FloatTensor)
-                predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
-                print(predicted_masks)
+                # Get probabilities
+                sigmoid = nn.Sigmoid()
+                probs = sigmoid(upsampled_logits)
                 
-                predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[1]
+                # Predict masks - Dice loss
+                predicted_masks = probs[:, 1, :, :]     # Artery class
                 masks_fi = seg.flatten().type(torch.FloatTensor)
                 predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
-                print(predicted_masks)
                 
                 # Calculate loss - Dice loss
                 loss = loss_fn(masks_fi, predicted_masks_fi)
+                train_dice += 1 - loss.item()         # Dice coefficient
                 valid_mask = ((seg >= 0) & (seg != segformer.config.semantic_loss_ignore_index)).float()
                 loss = (loss * valid_mask).mean()
 
@@ -96,19 +95,19 @@ def train_segformer(
                 train_loss += loss.item()
             
                 if i % 2 == 0:
-                    pbar.set_description(f"Training loss at step {i} = {train_loss / (i+1)}")
+                    pbar.set_description(f"Training loss at step {i} = {train_loss / (i+1)}, Dice coefficient = {train_dice / (i+1)}")
                     
             else:
                 break
 
         segformer.eval()
-        val_loss = 0
+        val_loss, val_dice = 0, 0
         total_imgs, total_preds, total_segs = [], [], []
         with torch.no_grad():
             pbar = tqdm(validation_loader)
             for i, batch in enumerate(pbar):
                 
-                if i < 4:
+                if i < 7:
                     
                     # Prepare data
                     image = batch["image"].to(DEVICE)
@@ -125,27 +124,30 @@ def train_segformer(
                                                                  mode='bilinear',
                                                                  align_corners=False)
 
+                    # Get probabilities
+                    sigmoid = nn.Sigmoid()
+                    probs = sigmoid(upsampled_logits)
+                    
                     # Predict masks - Dice loss
-                    # predicted_masks = upsampled_logits.squeeze(dim=1)
-                    predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[0]
+                    predicted_masks = probs[:, 1, :, :]     # Artery class
                     masks_fi = seg.flatten().type(torch.FloatTensor)
                     predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
-                    print(predicted_masks)
                     
                     # Calculate loss - Dice loss
                     loss = loss_fn(masks_fi, predicted_masks_fi)
+                    val_dice += 1 - loss.item()         # Dice coefficient
                     valid_mask = ((seg >= 0) & (seg != segformer.config.semantic_loss_ignore_index)).float()
                     loss = (loss * valid_mask).mean()
                     val_loss += loss.item()
                     
                     # Store images, predictions and masks
-                    # preds = torch.where(logits >= 0.5, 1.0, 0.0)
+                    preds = torch.where(predicted_masks >= 0.5, 1.0, 0.0)
                     total_imgs += image.detach().cpu().tolist()
-                    total_preds += predicted_masks[:, None, :, :].detach().cpu().tolist()
+                    total_preds += preds[:, None, :, :].detach().cpu().tolist()
                     total_segs += seg[:, None, :, :].detach().cpu().tolist()
                 
                     if i % 2 == 0:
-                        pbar.set_description(f"Validation loss at step {i} = {train_loss / (i+1)}")
+                        pbar.set_description(f"Validation loss at step {i} = {val_loss / (i+1)}, Dice coefficient = {val_dice / (i+1)}")
                 
                 else:
                     break
@@ -157,10 +159,14 @@ def train_segformer(
 
         train_loss = train_loss / len(train_loader)
         val_loss = val_loss / len(validation_loader)
+        train_dice = train_dice / len(train_loader)
+        val_dice = val_dice / len(validation_loader)
 
         metrics.append({
             "val_loss": val_loss,
             "train_loss": train_loss,
+            "val_dice": val_dice,
+            "train_dice": train_dice,
             "accuracy": a,
             "precision": p.tolist(),
             "recall": r.tolist(),
@@ -170,6 +176,8 @@ def train_segformer(
         
         train_losses.append(train_loss)
         val_losses.append(val_loss)
+        train_dices.append(train_dice)
+        val_dices.append(val_dice)
 
         if val_loss < min_val_loss:
             print("New min loss, saving model...")
@@ -183,7 +191,7 @@ def train_segformer(
                 json.dump(metrics[-1], f, indent=4)
 
             total_imgs_np = np.asarray(total_imgs)
-            rand_idx = np.random.choice(len(total_preds), 50, replace=False)
+            rand_idx = np.random.choice(len(total_preds), 2, replace=False)
 
             for idx in rand_idx:
                 _, ax = plt.subplots(ncols=3)
@@ -210,6 +218,15 @@ def train_segformer(
     plt.plot(val_losses)
     plt.legend(["Train Loss", "Validation Loss"])
     plt.savefig(out_dir / "loss.png")
+    plt.close()
+    
+    plt.title("Dice Per Epoch")
+    plt.xlabel("Epoch")
+    plt.ylabel("Dice Coefficient")
+    plt.plot(train_dices)
+    plt.plot(val_dices)
+    plt.legend(["Train Dice", "Validation Dice"])
+    plt.savefig(out_dir / "dice.png")
     plt.close()
 
 
