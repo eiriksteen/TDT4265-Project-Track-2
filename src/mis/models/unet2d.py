@@ -36,7 +36,6 @@ class ResnetBlock(nn.Module):
 
         if block_output is not None:
             x = torch.cat((x, block_output), dim=1)
-            # x += block_output
 
         logits = self.block(x)
 
@@ -143,10 +142,10 @@ class NonLocalBlock(nn.Module):
         return x + A
 
 
-class Unet2d(nn.Module):
+class UNet2D(nn.Module):
 
     def __init__(self,in_channels: int, out_channels: int):
-        super(Unet2d, self).__init__()
+        super(UNet2D, self).__init__()
 
         self.encoder = Encoder(in_channels)
         self.decoder = Decoder(out_channels)
@@ -160,10 +159,10 @@ class Unet2d(nn.Module):
 
         return upsampled, probs
     
-class Unet2dNonLocal(nn.Module):
+class UNet2DNonLocal(nn.Module):
 
     def __init__(self,in_channels: int, out_channels: int):
-        super(Unet2dNonLocal, self).__init__()
+        super(UNet2DNonLocal, self).__init__()
 
         self.encoder = Encoder(in_channels, non_local=True)
         self.decoder = Decoder(out_channels, non_local=True)
