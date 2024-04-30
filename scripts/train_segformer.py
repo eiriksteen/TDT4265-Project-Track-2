@@ -175,7 +175,7 @@ def train_segformer(
                 json.dump(metrics[-1], f, indent=4)
 
             total_imgs_np = np.asarray(total_imgs)
-            rand_idx = np.random.choice(len(total_preds), 2, replace=False)
+            rand_idx = np.random.choice(len(total_preds), 50, replace=False)
 
             for idx in rand_idx:
                 _, ax = plt.subplots(ncols=3)
