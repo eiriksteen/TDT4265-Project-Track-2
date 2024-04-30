@@ -56,7 +56,7 @@ def train_segformer(
         pbar = tqdm(train_loader)
         for i, batch in enumerate(pbar):
 
-            if i < 7:
+            if i < 20:
 
                 # Prepare data
                 image = batch["image"].to(DEVICE)
@@ -107,7 +107,7 @@ def train_segformer(
             pbar = tqdm(validation_loader)
             for i, batch in enumerate(pbar):
                 
-                if i < 7:
+                if i < 10:
                     
                     # Prepare data
                     image = batch["image"].to(DEVICE)
@@ -191,7 +191,7 @@ def train_segformer(
                 json.dump(metrics[-1], f, indent=4)
 
             total_imgs_np = np.asarray(total_imgs)
-            rand_idx = np.random.choice(len(total_preds), 2, replace=False)
+            rand_idx = np.random.choice(len(total_preds), 10, replace=False)
 
             for idx in rand_idx:
                 _, ax = plt.subplots(ncols=3)
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 
     loss = "focal"
     dataset = "asoca"
-    num_epochs = 2
+    num_epochs = 10
     lr = 1e-04
     batch_size = 8
 
