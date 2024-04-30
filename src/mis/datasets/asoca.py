@@ -14,6 +14,7 @@ class ASOCADataset(Dataset):
             two_dim: bool = True,
             to_torch: bool = True,
             norm: bool = True,
+            thresh: bool = True,
             data_dir: Path = ASOCA_PATH,
         ):
         super().__init__()
@@ -25,6 +26,7 @@ class ASOCADataset(Dataset):
         self.data_dir = data_dir
         self.n_path = data_dir / "Normal"
         self.d_path = data_dir / "Diseased"
+        self.thresh = thresh
         self.num_slices, self.num_normal, self.num_diseased = self.get_num_slices()
         self.slice_cumsums = np.asarray(self.num_slices).cumsum()
 
@@ -54,7 +56,8 @@ class ASOCADataset(Dataset):
         if self.to_torch:
             ctca = Resize((self.size, self.size))(torch.Tensor(ctca))
             anno = Resize((self.size, self.size))(torch.Tensor(anno))
-            anno = torch.where(anno > 0.0, 1.0, 0.0)
+            if self.thresh:
+                anno = torch.where(anno > 0.0, 1.0, 0.0)
 
         return {
             "image": ctca,

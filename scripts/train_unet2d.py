@@ -12,7 +12,7 @@ from tqdm import tqdm
 from pprint import pprint
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
-from mis.models import Unet2d, Unet2dNonLocal
+from mis.models import UNet2D, UNet2DNonLocal
 from mis.datasets import ASOCADataset, BratsDataset
 from mis.settings import DEVICE, ASOCA_PATH
 from mis.loss import dice_loss, gdlv_loss, focal_loss
@@ -37,10 +37,8 @@ def train(
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.99)
     train_dl = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
-    metrics = []
     min_loss = float("inf")
-    loss_fn = dice_loss if args.loss == "dice" else focal_loss
-    # loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([0.01]).to(DEVICE))
+    loss_fn = dice_loss if args.loss == "dice" else gdlv_loss if args.loss=="gdlv" else focal_loss
     train_losses, val_losses = [], []
     train_dices, val_dices = [], []
 
@@ -55,12 +53,8 @@ def train(
 
             images = batch["image"].to(DEVICE)
             masks = batch["mask"].to(DEVICE)
-
             _, probs = model(images)
-            # loss = focal_loss(masks, probs)
             loss = loss_fn(masks, probs)
-
-            print(torch.where(probs > 0.5, 1,0).count_nonzero())
 
             optimizer.zero_grad()
             loss.backward()
@@ -82,12 +76,12 @@ def train(
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
                 _, probs = model(images)
-                # loss = focal_loss(masks, probs)
                 loss = loss_fn(masks, probs)
                 val_loss += loss.item()
                 val_dice += 1 - dice_loss(masks, probs).item()
 
-                preds = torch.where(probs >= 0.5, 1.0, 0.0)
+                preds = torch.where(probs >= 0.5, 1.0, 0.0) if args.thresh else probs
+
                 total_imgs += images.detach().cpu().tolist()
                 total_preds += preds.detach().cpu().tolist()
                 total_masks += masks.detach().cpu().tolist()
@@ -97,25 +91,31 @@ def train(
 
         total_masks_np = np.asarray(total_masks)
         total_preds_np = np.asarray(total_preds)
-        a = accuracy_score(total_masks_np.flatten(), total_preds_np.flatten())
-        p, r, f, s = precision_recall_fscore_support(total_masks_np.flatten(), total_preds_np.flatten())
+
+        if args.thresh:
+            a = accuracy_score(total_masks_np.flatten(), total_preds_np.flatten())
+            p, r, f, s = precision_recall_fscore_support(total_masks_np.flatten(), total_preds_np.flatten())
 
         train_loss = train_loss / len(train_dl)
         val_loss = val_loss / len(validation_dl)
         train_dice = train_dice / len(train_dl)
         val_dice = val_dice / len(validation_dl)
 
-        metrics.append({
+        metrics = {
             "val_loss": val_loss,
             "train_loss": train_loss,
             "val_dice": val_dice,
             "train_dice": train_dice,
-            "accuracy": a,
-            "precision": p.tolist(),
-            "recall": r.tolist(),
-            "f1": f.tolist(),
-            "support": s.tolist()
-        })
+        }
+
+        if args.thresh:
+            a = accuracy_score(total_masks_np.flatten(), total_preds_np.flatten())
+            p, r, f, s = precision_recall_fscore_support(total_masks_np.flatten(), total_preds_np.flatten())
+            metrics["accuracy"] = a
+            metrics["precision"] = p.tolist()
+            metrics["recall"] = r.tolist()
+            metrics["f1"] = f.tolist()
+            metrics["support"] = s.tolist()
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -131,7 +131,7 @@ def train(
             epoch_dir.mkdir(exist_ok=True)
   
             with open(epoch_dir / "metrics.json", "w") as f:
-                json.dump(metrics[-1], f)
+                json.dump(metrics, f)
 
             total_imgs_np = np.asarray(total_imgs)
             rand_idx = np.random.choice(len(total_preds), 50, replace=False)
@@ -152,7 +152,7 @@ def train(
                 plt.savefig(epoch_dir / f"pred{idx}")
                 plt.close()
 
-        pprint(metrics[-1])
+        pprint(metrics)
 
     plt.title("Loss Per Epoch")
     plt.xlabel("Epoch")
@@ -172,8 +172,6 @@ def train(
     plt.savefig(out_dir / "dice.png")
     plt.close()
 
-    return model, metrics
-
 
 if __name__ == "__main__":
 
@@ -181,14 +179,15 @@ if __name__ == "__main__":
 
     parser.add_argument("--lr", default=1e-04, type=float)
     parser.add_argument("--batch_size", default=8, type=int)
-    parser.add_argument("--num_epochs", default=10, type=int)
+    parser.add_argument("--num_epochs", default=5, type=int)
     parser.add_argument("--loss", default="dice", type=str)
     parser.add_argument("--dataset", default="asoca", type=str)
     parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--thresh", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
 
-    losses = ["dice", "focal"]
+    losses = ["dice", "focal", "gdlv"]
     if args.loss not in losses:
         raise ValueError(f"Loss must not be in {losses}")
     
@@ -202,7 +201,8 @@ if __name__ == "__main__":
             two_dim=True,
             to_torch=True,
             norm=True,
-            data_dir=ASOCA_PATH
+            data_dir=ASOCA_PATH,
+            thresh=args.thresh
         )
     else:
         data = BratsDataset(
@@ -213,10 +213,10 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}_{args.dataset}")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_training_results_{args.loss}_{args.dataset}_t{args.thresh}")
     out_dir.mkdir(exist_ok=True)
 
-    model = Unet2dNonLocal(1, 1) if args.non_local else Unet2d(1, 1)
+    model = UNet2DNonLocal(1, 1) if args.non_local else UNet2D(1, 1)
 
     try:
         model.load_state_dict(torch.load(out_dir / "model"))
