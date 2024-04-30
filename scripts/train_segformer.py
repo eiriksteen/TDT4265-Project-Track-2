@@ -36,9 +36,10 @@ def train_segformer(
         out_dir = Path("segformer_training_results")
     ):
 
+    segformer = segformer.to(DEVICE)
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, drop_last=True)
     validation_loader = DataLoader(validation_data, batch_size=batch_size, shuffle=True, drop_last=True)
-    loss_fn = focal_loss
+    loss_fn = dice_loss
     optimizer = torch.optim.AdamW(segformer.parameters(), lr=lr)
     min_val_loss = float("inf")
     out_dir.mkdir(exist_ok=True)
@@ -54,12 +55,12 @@ def train_segformer(
         pbar = tqdm(train_loader)
         for i, batch in enumerate(pbar):
 
-            if i < 2:
+            if i < 4:
 
                 # Prepare data
-                image = batch["image"]
-                seg = batch["mask"]
-                seg = seg.squeeze(dim=1).type(torch.LongTensor)
+                image = batch["image"].to(DEVICE)
+                seg = batch["mask"].to(DEVICE)
+                seg = seg.squeeze(dim=1).type(torch.LongTensor).to(DEVICE)
 
                 # Forward pass
                 outputs = segformer(pixel_values=image, labels=seg)
@@ -70,17 +71,23 @@ def train_segformer(
                                                                  size=seg.size()[-2:],
                                                                  mode='bilinear',
                                                                  align_corners=False)
-
-                # Predict masks - Focal loss
-                predicted_masks = upsampled_logits.argmax(dim=1)
+                
+                # Predict masks - Dice loss
+                predicted_masks = upsampled_logits.squeeze(dim=1)
+                # predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[0]
                 masks_fi = seg.flatten().type(torch.FloatTensor)
                 predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
-                # masks_fi = seg.flatten().type(np.uint8)                               # For dice loss
-                # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)         # For dice loss
+                print(predicted_masks)
                 
-                # # Calculate loss - Focal loss
+                predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[1]
+                masks_fi = seg.flatten().type(torch.FloatTensor)
+                predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
+                print(predicted_masks)
+                
+                # Calculate loss - Dice loss
                 loss = loss_fn(masks_fi, predicted_masks_fi)
-                loss = Variable(loss, requires_grad=True)
+                valid_mask = ((seg >= 0) & (seg != segformer.config.semantic_loss_ignore_index)).float()
+                loss = (loss * valid_mask).mean()
 
                 # loss = outputs.loss
                 optimizer.zero_grad()
@@ -101,12 +108,12 @@ def train_segformer(
             pbar = tqdm(validation_loader)
             for i, batch in enumerate(pbar):
                 
-                if i < 2:
+                if i < 4:
                     
                     # Prepare data
-                    image = batch["image"]
-                    seg = batch["mask"]
-                    seg = seg.squeeze(dim=1).type(torch.LongTensor)
+                    image = batch["image"].to(DEVICE)
+                    seg = batch["mask"].to(DEVICE)
+                    seg = seg.squeeze(dim=1).type(torch.LongTensor).to(DEVICE)
 
                     # Forward pass
                     outputs = segformer(pixel_values=image, labels=seg)
@@ -118,16 +125,17 @@ def train_segformer(
                                                                  mode='bilinear',
                                                                  align_corners=False)
 
-                    # Predict masks - Focal loss
-                    predicted_masks = upsampled_logits.argmax(dim=1)
+                    # Predict masks - Dice loss
+                    # predicted_masks = upsampled_logits.squeeze(dim=1)
+                    predicted_masks = upsampled_logits.max(dim=1, keepdim=True)[0]
                     masks_fi = seg.flatten().type(torch.FloatTensor)
                     predicted_masks_fi = predicted_masks.flatten().type(torch.FloatTensor)
-                    # masks_fi = seg.flatten().type(np.uint8)                               # For dice loss
-                    # predicted_masks_fi = predicted_masks.flatten().type(np.uint8)         # For dice loss
-
-                    # # Calculate loss - Focal loss
+                    print(predicted_masks)
+                    
+                    # Calculate loss - Dice loss
                     loss = loss_fn(masks_fi, predicted_masks_fi)
-                    loss = Variable(loss, requires_grad=True)
+                    valid_mask = ((seg >= 0) & (seg != segformer.config.semantic_loss_ignore_index)).float()
+                    loss = (loss * valid_mask).mean()
                     val_loss += loss.item()
                     
                     # Store images, predictions and masks
@@ -242,7 +250,7 @@ if __name__ == "__main__":
     loss = "focal"
     dataset = "asoca"
     num_epochs = 2
-    lr = 1e-03
+    lr = 1e-04
     batch_size = 8
 
     out_dir = Path(f"segformer_training_results_{loss}_{dataset}")
