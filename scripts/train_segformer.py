@@ -16,13 +16,15 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
 from mis.datasets import ASOCADataset, BratsDataset
 from mis.settings import DEVICE, ASOCA_PATH
-from mis.loss import dice_loss, gdlv_loss, focal_loss, cross_entropy_loss
+from mis.loss import dice_loss, gdlv_loss, mix_loss
 
 sns.set_style("darkgrid")
 plt.rc("figure", figsize=(16, 8))
 plt.rc("font", size=13)
 
 torch.manual_seed(0)
+
+F.cross_entropy
 
 def train(
         model: nn.Module,
@@ -39,7 +41,7 @@ def train(
     train_dl = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     validation_dl = DataLoader(validation_data, batch_size=args.batch_size)
     min_loss = float("inf")
-    loss_fn = dice_loss if args.loss == "dice" else gdlv_loss if args.loss=="gdlv" else focal_loss
+    loss_fn = dice_loss if args.loss == "dice" else gdlv_loss if args.loss=="gdlv" else mix_loss
     train_losses, val_losses = [], []
     train_dices, val_dices = [], []
 
@@ -82,6 +84,10 @@ def train(
                 logits = F.interpolate(logits_, scale_factor=4, mode="bilinear", align_corners=False)
                 probs = F.sigmoid(logits)
                 loss = loss_fn(masks, probs)
+
+                valid_mask = ((masks >= 0) & (masks != 0)).float()
+                loss = (valid_mask * loss).mean()
+
                 val_loss += loss.item()
                 val_dice += 1 - dice_loss(masks, probs).item()
 
@@ -192,7 +198,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    losses = ["dice", "focal", "gdlv"]
+    losses = ["dice", "gdlv", "mix"]
     if args.loss not in losses:
         raise ValueError(f"Loss must not be in {losses}")
     

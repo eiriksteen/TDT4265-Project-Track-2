@@ -12,12 +12,14 @@ class ResnetBlock(nn.Module):
     def __init__(
             self, 
             in_channels, 
-            out_channels
+            out_channels,
+            skip_conn = "concat"
             ):
         super(ResnetBlock, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.skip_conn = skip_conn
 
         self.block = nn.Sequential(
             nn.GroupNorm(32, in_channels),
@@ -35,7 +37,10 @@ class ResnetBlock(nn.Module):
     def forward(self, x, block_output=None):
 
         if block_output is not None:
-            x = torch.cat((x, block_output), dim=1)
+            if self.skip_conn == "concat":
+                x = torch.cat((x, block_output), dim=1)
+            else:
+                x = x + block_output
 
         logits = self.block(x)
 
@@ -75,19 +80,24 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, out_channels: int, non_local=False):
+    def __init__(
+            self, 
+            out_channels: int, 
+            skip_conn = "concat",
+            non_local=False):
         super(Decoder, self).__init__()
 
+        m = 2 if skip_conn == "concat" else 1
         self.network = nn.ModuleList([
-            ResnetBlock(512*2, 512),
+            ResnetBlock(512*m, 512, skip_conn),
             NonLocalBlock(512) if non_local else nn.Identity(),
             nn.ConvTranspose2d(512, 256, 2, 2),
-            ResnetBlock(256*2, 256),
+            ResnetBlock(256*m, 256, skip_conn),
             NonLocalBlock(256) if non_local else nn.Identity(),
             nn.ConvTranspose2d(256, 128, 2, 2),
-            ResnetBlock(128*2, 128),
+            ResnetBlock(128*m, 128, skip_conn),
             nn.ConvTranspose2d(128, 64, 2, 2),
-            ResnetBlock(64*2, 64),
+            ResnetBlock(64*m, 64, skip_conn),
             nn.Conv2d(64, out_channels, 1, 1),
         ])
 
