@@ -23,7 +23,7 @@ from mis.loss import dice_loss, gdlv_loss, focal_loss
 
 if __name__ == "__main__":
 
-    model_dir = Path.cwd() / "unet2d_training_results_dice_asoca" / "model"
+    model_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts") / "unet2d_training_results_dice_asoca_tNone" / "model"
     
     config = SegformerConfig(num_channels=1, num_labels=1)
     model = SegformerForSemanticSegmentation(config)
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     normal_dir = ASOCA_PATH / "Normal" / "Testset_Normal"
     diseased_dir = ASOCA_PATH / "Diseased" / "Testset_Disease"
 
-    out_dir = Path.cwd() / "test_preds"
+    out_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts") / "test_preds"
     out_dir.mkdir(exist_ok=True)
 
     size = 256
