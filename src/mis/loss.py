@@ -5,6 +5,10 @@ def dice_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
     return 1 - (2 * (y_true*y_pred).sum() + 1) / ((y_true**2).sum()+(y_pred**2).sum() + 1)
 
+def cross_entropy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+
+    return -(y_true * torch.log(y_pred) + (1 - y_true) * torch.log(1 - y_pred)).mean()
+
 def gdlv_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
     r0, p0 = (1 - y_true).flatten(start_dim=1), (1 - y_pred).flatten(start_dim=1)

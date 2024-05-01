@@ -16,7 +16,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
 from mis.datasets import ASOCADataset, BratsDataset
 from mis.settings import DEVICE, ASOCA_PATH
-from mis.loss import dice_loss, gdlv_loss, focal_loss
+from mis.loss import dice_loss, gdlv_loss, focal_loss, cross_entropy_loss
 
 sns.set_style("darkgrid")
 plt.rc("figure", figsize=(16, 8))
@@ -54,8 +54,9 @@ def train(
 
             images = batch["image"].to(DEVICE)
             masks = batch["mask"].to(DEVICE)
-            probs_ = F.sigmoid(model(images).logits)
-            probs = F.interpolate(probs_, scale_factor=4, mode="bilinear", align_corners=False)
+            logits_ = model(images).logits
+            logits = F.interpolate(logits_, scale_factor=4, mode="bilinear", align_corners=False)
+            probs = F.sigmoid(logits)
             loss = loss_fn(masks, probs)
 
             optimizer.zero_grad()
@@ -77,8 +78,9 @@ def train(
 
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
-                probs_ = F.sigmoid(model(images).logits)
-                probs = F.interpolate(probs_, scale_factor=4, mode="bilinear", align_corners=False)
+                logits_ = model(images).logits
+                logits = F.interpolate(logits_, scale_factor=4, mode="bilinear", align_corners=False)
+                probs = F.sigmoid(logits)
                 loss = loss_fn(masks, probs)
                 val_loss += loss.item()
                 val_dice += 1 - dice_loss(masks, probs).item()
