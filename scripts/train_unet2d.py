@@ -46,6 +46,7 @@ def train(
 
         print(f"STARTING EPOCH {epoch+1}")
         train_loss, train_dice = 0, 0
+        total_imgs, total_preds, total_masks = [], [], []
         model.train()
 
         pbar = tqdm(train_dl)
@@ -68,7 +69,6 @@ def train(
         print("RUNNING VALIDATION")
         model.eval()
         val_loss, val_dice  = 0, 0
-        total_imgs, total_preds, total_masks = [], [], []
         with torch.no_grad():
             pbar = tqdm(validation_dl)
             for i, batch in enumerate(pbar):
@@ -246,10 +246,10 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_{args.loss}_{args.skip_conn}{'_t' if args.thresh else ''}_{args.split_strat}")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_{args.loss}_{args.skip_conn}{'_t' if args.thresh else ''}_{args.split_strat}{'_mtv' if args.merge_test_val else ''}")
     out_dir.mkdir(exist_ok=True)
 
-    model = UNet2DNonLocal(1, 1) if args.non_local else UNet2D(1, 1)
+    model = UNet2DNonLocal(1, 1, skip_conn=args.skip_conn) if args.non_local else UNet2D(1, 1, args.skip_conn)
 
     try:
         model.load_state_dict(torch.load(out_dir / "model"))

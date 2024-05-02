@@ -47,6 +47,7 @@ def train(
 
         print(f"STARTING EPOCH {epoch+1}")
         train_loss, train_dice = 0, 0
+        total_imgs, total_preds, total_masks = [], [], []
         model.train()
 
         pbar = tqdm(train_dl)
@@ -71,7 +72,6 @@ def train(
         print("RUNNING VALIDATION")
         model.eval()
         val_loss, val_dice  = 0, 0
-        total_imgs, total_preds, total_masks = [], [], []
         with torch.no_grad():
             pbar = tqdm(validation_dl)
             for i, batch in enumerate(pbar):

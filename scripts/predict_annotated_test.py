@@ -57,7 +57,7 @@ if __name__ == "__main__":
     healthy_idx = data.tih
     diseased_idx = data.tid
 
-    model_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_dice_{args.skip_conn}{'_t' if args.thresh else ''}_patientwise") / "model"
+    model_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_dice_{args.skip_conn}{'_t' if args.thresh else ''}_patientwise") / "epoch3" / "model"
     model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 

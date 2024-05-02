@@ -154,11 +154,16 @@ class NonLocalBlock(nn.Module):
 
 class UNet2D(nn.Module):
 
-    def __init__(self,in_channels: int, out_channels: int):
+    def __init__(
+            self,
+            in_channels: int, 
+            out_channels: int,
+            skip_conn: str = "concat"
+            ):
         super(UNet2D, self).__init__()
 
         self.encoder = Encoder(in_channels)
-        self.decoder = Decoder(out_channels)
+        self.decoder = Decoder(out_channels, skip_conn=skip_conn)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -171,11 +176,16 @@ class UNet2D(nn.Module):
     
 class UNet2DNonLocal(nn.Module):
 
-    def __init__(self,in_channels: int, out_channels: int):
+    def __init__(
+            self,
+            in_channels: int, 
+            out_channels: int,
+            skip_conn: str = "concat"
+            ):
         super(UNet2DNonLocal, self).__init__()
 
         self.encoder = Encoder(in_channels, non_local=True)
-        self.decoder = Decoder(out_channels, non_local=True)
+        self.decoder = Decoder(out_channels, non_local=True, skip_conn=skip_conn)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
