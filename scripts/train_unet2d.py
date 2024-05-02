@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
-    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_{args.loss}_{args.skip_conn}{'_t' if args.thresh else ''}")
+    out_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_{args.loss}_{args.skip_conn}{'_t' if args.thresh else ''}_{args.split_strat}")
     out_dir.mkdir(exist_ok=True)
 
     model = UNet2DNonLocal(1, 1) if args.non_local else UNet2D(1, 1)

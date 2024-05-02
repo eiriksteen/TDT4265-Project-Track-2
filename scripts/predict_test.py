@@ -14,6 +14,7 @@ if __name__ == "__main__":
 
     model_dir = Path.cwd() / "unet2d_training_results_dice_asoca" / "model"
     model = UNet2D(1, 1).to(DEVICE)
+    model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
     normal_dir = ASOCA_PATH / "Normal" / "Testset_Normal"
     diseased_dir = ASOCA_PATH / "Diseased" / "Testset_Disease"

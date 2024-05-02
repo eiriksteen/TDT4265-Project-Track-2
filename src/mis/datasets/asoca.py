@@ -127,9 +127,12 @@ class ASOCADataset(Dataset):
             if self.split == "train":
                 normal_idx = self.trih
                 diseased_idx = self.trid
-            else:
+            elif self.split == "validation":
                 normal_idx = self.vih
                 diseased_idx = self.vid
+            else:
+                normal_idx = self.tih
+                diseased_idx = self.tid
 
         for i in normal_idx:
             data, _ = nrrd.read(self.n_path / "CTCA" / f"Normal_{i}.nrrd")
