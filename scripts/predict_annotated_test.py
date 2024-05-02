@@ -1,3 +1,4 @@
+import argparse
 import torch
 import numpy as np
 import torch.utils
@@ -33,6 +34,14 @@ def dice(y_true, y_pred):
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--skip_conn", default="concat", type=str)
+    parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--thresh", action=argparse.BooleanOptionalAction)
+
+    args = parser.parse_args()
+
     size = 256
     data = ASOCADataset(
         size=size,
@@ -48,14 +57,14 @@ if __name__ == "__main__":
     healthy_idx = data.tih
     diseased_idx = data.tid
 
-    model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"
+    model_dir = Path(f"unet2d{'_nonlocal' if args.non_local else ''}_results_dice_{args.skip_conn}{'_t' if args.thresh else ''}_patientwise") / "model"
     model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
     normal_dir = ASOCA_PATH / "Normal"
     diseased_dir = ASOCA_PATH / "Diseased" 
 
-    out_dir = Path.cwd() / "annotest_preds"
+    out_dir = Path(f"testres_unet2d_{'_nonlocal' if args.non_local else ''}{args.skip_conn}{'_t' if args.thresh else ''}")
     out_dir.mkdir(exist_ok=True)
 
     avg_dice = 0
