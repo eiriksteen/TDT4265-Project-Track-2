@@ -264,7 +264,7 @@ if __name__ == "__main__":
     # Run model
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(validation_data)} VALID SAMPLES")
 
-    loss = "focal"
+    loss = "dice"
     dataset = "asoca"
     num_epochs = 10
     lr = 1e-04
