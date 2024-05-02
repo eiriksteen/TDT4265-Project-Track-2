@@ -181,7 +181,7 @@ def train_segformer(
 
         if val_loss < min_val_loss:
             print("New min loss, saving model...")
-            torch.save(segformer.state_dict(), out_dir / "segformer")
+            torch.save(segformer.state_dict(), out_dir / "model")
             min_val_loss = val_loss
             
             epoch_dir = out_dir / f"epoch{epoch+1}"
@@ -274,10 +274,10 @@ if __name__ == "__main__":
     out_dir.mkdir(exist_ok=True)
 
     try:
-        segformer.load_state_dict(torch.load(out_dir / "segformer"))
-        print(f"Found model at {out_dir / 'segformer'}, resuming training")
+        segformer.load_state_dict(torch.load(out_dir / "model"))
+        print(f"Found model at {out_dir / 'model'}, resuming training")
     except FileNotFoundError:
-        print(f"No model found at {out_dir / 'segformer'}, training from scratch")
+        print(f"No model found at {out_dir / 'model'}, training from scratch")
 
     start = time.time()
 
