@@ -8,7 +8,7 @@ import nrrd
 import torch.nn.functional as F
 from torchvision.transforms import Resize
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
-from mis.models import UNet2D
+from mis.models import UNet2D, UNet2DNonLocal
 from mis.settings import DEVICE, ASOCA_PATH
 import time
 
@@ -16,9 +16,15 @@ def perform_runtime_analysis_unet(model_name, number_of_patients=3):
     
     # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
     scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
-    model_dir = scripts_dir / f"{model_name}" / "model"
+    model_dir = scripts_dir / f"{model_name}" / "epoch2" / "model"
     
-    model = UNet2D(1, 1).to(DEVICE)
+    if "nonlocal" in model_name:
+        if "concat" in model_name:
+            model = UNet2DNonLocal(1, 1, skip_conn="concat").to(DEVICE)
+        else:
+            model = UNet2DNonLocal(1, 1, skip_conn="sum").to(DEVICE)
+    else:
+        model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
     normal_dir = ASOCA_PATH / "Normal" / "Testset_Normal"
@@ -113,14 +119,8 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
     # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
     scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
     model_dir = scripts_dir / f"{model_name}" / "model"
-    
-    config = SegformerConfig()
-    config.id2label = {0: "background", 1: "artery"}
-    config.label2id = {"background": 0, "artery": 1}
-    config.semantic_loss_ignore_index = 0
-    config.num_channels = 1
 
-    model = SegformerForSemanticSegmentation(config).to(DEVICE)
+    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/mit-b0", num_labels=1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
     normal_dir = ASOCA_PATH / "Normal" / "Testset_Normal"
@@ -162,7 +162,7 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
             data_preprocessing_time_slice_t1 = time.time()
             
             inference_time_slice_t0 = time.time()
-            preds_nt = model(ctca[None,:,:,:])[-1]
+            preds_nt = model(ctca[None,:,:,:].repeat(1,3,1,1))[-1]
             inference_time_slice_t1 = time.time()
             
             data_postprocessing_time_slice_t0 = time.time()
@@ -213,9 +213,8 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
 if __name__ == "__main__":
     
     model_names = [
-        "unet2d_results_dice_concat_t",
-        "unet2d_results_dice_sum_t",
-        "segformer_training_results_dice_asoca_base"
+        # "unet2d_nonlocal_results_dice_concat_t_patientwise",
+        "segformer_results_dice_t_patientwise_killed"
     ]
     number_of_patients = 2
     
