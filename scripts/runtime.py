@@ -50,7 +50,7 @@ def perform_runtime_analysis_unet(model_name, number_of_patients=3):
         data_postprocessing_times_slices = []
         
         print(f"Predicting patient {i+1}...")
-        for slice_idx in tqdm(range(img.shape[-1])[:5]):
+        for slice_idx in tqdm(range(img.shape[-1])):
             
             data_preprocessing_time_slice_t0 = time.time()
             ctca = img[:, :, slice_idx][None, :, :]
@@ -114,7 +114,12 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
     scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
     model_dir = scripts_dir / f"{model_name}" / "model"
     
-    config = SegformerConfig(num_channels=1, num_labels=1)
+    config = SegformerConfig()
+    config.id2label = {0: "background", 1: "artery"}
+    config.label2id = {"background": 0, "artery": 1}
+    config.semantic_loss_ignore_index = 0
+    config.num_channels = 1
+
     model = SegformerForSemanticSegmentation(config).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
@@ -147,7 +152,7 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
         data_postprocessing_times_slices = []
         
         print(f"Predicting patient {i+1}...")
-        for slice_idx in tqdm(range(img.shape[-1])[:5]):
+        for slice_idx in tqdm(range(img.shape[-1])):
             
             data_preprocessing_time_slice_t0 = time.time()
             ctca = img[:, :, slice_idx][None, :, :]
@@ -163,7 +168,6 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
             data_postprocessing_time_slice_t0 = time.time()
             preds_nu = torch.where(preds_nt>=0.5, 1.0, 0.0)
             preds_u = F.interpolate(preds_nu, scale_factor=2, mode="nearest")
-            preds[:,:,slice_idx] = preds_u.detach().cpu().numpy()
             data_postprocessing_time_slice_t1 = time.time()
             
             data_preprocessing_times_slices.append(data_preprocessing_time_slice_t1 - data_preprocessing_time_slice_t0)
@@ -209,12 +213,11 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
 if __name__ == "__main__":
     
     model_names = [
-        # "unet2d_training_results_dice_asoca_tNone",
-        # "unet2d_results_dice_concat_t",
-        # "unet2d_results_dice_sum_t",
+        "unet2d_results_dice_concat_t",
+        "unet2d_results_dice_sum_t",
         "segformer_training_results_dice_asoca_base"
     ]
-    number_of_patients = 3
+    number_of_patients = 2
     
     for model in model_names:
         if "unet2d" in model:
