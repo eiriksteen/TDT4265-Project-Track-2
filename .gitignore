@@ -1,5 +1,6 @@
 data
 examples
+venv
 
 .DS_Store
 .ENV
@@ -10,6 +11,7 @@ test.py
 *egg*
 
 *results*
+*runtimes*
 wandb
 
 ASOCA
