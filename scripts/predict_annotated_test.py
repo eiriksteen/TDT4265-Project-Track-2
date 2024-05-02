@@ -155,5 +155,8 @@ if __name__ == "__main__":
         avg_dice += dice_score
         avg_haus += haus_score
 
+    avg_dice /= len(healthy_idx) + len(diseased_idx)
+    avg_haus /= len(healthy_idx) + len(diseased_idx)
+
     with open(out_dir / "metrics.json", "w") as f:
         json.dump({"dice_score": avg_dice, "hausdorff_95": avg_haus}, f)
