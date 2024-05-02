@@ -124,11 +124,12 @@ def train(
 
         if val_loss < min_loss:
             print("New min loss, saving model...")
-            torch.save(model.state_dict(), out_dir / "model")
             min_loss = val_loss
 
             epoch_dir = out_dir / f"epoch{epoch+1}"
             epoch_dir.mkdir(exist_ok=True)
+
+            torch.save(model.state_dict(), epoch_dir / "model")
   
             with open(epoch_dir / "metrics.json", "w") as f:
                 json.dump(metrics, f)
@@ -183,6 +184,8 @@ if __name__ == "__main__":
     parser.add_argument("--loss", default="dice", type=str)
     parser.add_argument("--dataset", default="asoca", type=str)
     parser.add_argument("--skip_conn", default="concat", type=str)
+    parser.add_argument("--split_strat", default="patientwise", type=str)
+    parser.add_argument("--merge_test_val", action=argparse.BooleanOptionalAction)
     parser.add_argument("--non_local", action=argparse.BooleanOptionalAction)
     parser.add_argument("--thresh", action=argparse.BooleanOptionalAction)
 
@@ -190,27 +193,56 @@ if __name__ == "__main__":
 
     losses = ["dice", "focal", "gdlv"]
     if args.loss not in losses:
-        raise ValueError(f"Loss must not be in {losses}")
+        raise ValueError(f"Loss must be in {losses}")
     
     dsets = ["asoca", "brats"]
     if args.dataset not in dsets:
         raise ValueError(f"Dset must be in {dsets}")
 
     if args.dataset == "asoca":
-        data = ASOCADataset(
-            size=256,
-            two_dim=True,
-            to_torch=True,
-            norm=True,
-            data_dir=ASOCA_PATH,
-            thresh=args.thresh
-        )
+
+        if args.split_strat == "patientwise":
+            train_data = ASOCADataset(
+                size=256,
+                split="train",
+                merge_test_validation=args.merge_test_val,
+                two_dim=True,
+                to_torch=True,
+                norm=True,
+                data_dir=ASOCA_PATH,
+                thresh=args.thresh,
+                split_strat=args.split_strat
+            )
+            val_data = ASOCADataset(
+                size=256,
+                split="validation",
+                merge_test_validation=args.merge_test_val,
+                two_dim=True,
+                to_torch=True,
+                norm=True,
+                data_dir=ASOCA_PATH,
+                thresh=args.thresh,
+                split_strat=args.split_strat
+            )
+
+        else:
+            data = ASOCADataset(
+                size=256,
+                two_dim=True,
+                to_torch=True,
+                norm=True,
+                data_dir=ASOCA_PATH,
+                thresh=args.thresh,
+                split_strat=args.split_strat
+            )
+
+            train_data, val_data = torch.utils.data.random_split(data, [0.8, 0.2])
     else:
         data = BratsDataset(
             "train"
         )
 
-    train_data, val_data = torch.utils.data.random_split(data, [0.8, 0.2])
+        train_data, val_data = torch.utils.data.random_split(data, [0.8, 0.2])
 
     print(f"RUNNING WITH {len(train_data)} TRAIN SAMPLES AND {len(val_data)} VALID SAMPLES")
 
