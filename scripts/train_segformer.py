@@ -54,7 +54,7 @@ def train(
 
             images = batch["image"].to(DEVICE)
             masks = batch["mask"].to(DEVICE)
-            logits_ = model(images).logits
+            logits_ = model(images.repeat(1,3,1,1)).logits
             logits = F.interpolate(logits_, scale_factor=4, mode="bilinear", align_corners=False)
             probs = F.sigmoid(logits)
             loss = loss_fn(masks, probs)
@@ -78,7 +78,7 @@ def train(
 
                 images = batch["image"].to(DEVICE)
                 masks = batch["mask"].to(DEVICE)
-                logits_ = model(images).logits
+                logits_ = model(images.repeat(1,3,1,1)).logits
                 logits = F.interpolate(logits_, scale_factor=4, mode="bilinear", align_corners=False)
                 probs = F.sigmoid(logits)
                 loss = loss_fn(masks, probs)
@@ -253,8 +253,8 @@ if __name__ == "__main__":
     out_dir = Path(f"segformer_results_{args.loss}{'_t' if args.thresh else ''}_{args.split_strat}")
     out_dir.mkdir(exist_ok=True)
 
-    config = SegformerConfig(num_channels=1, num_labels=1)
-    model = SegformerForSemanticSegmentation(config)
+    # config = SegformerConfig(num_channels=1, num_labels=1)
+    model = SegformerForSemanticSegmentation.from_pretrained("nvidia/mit-b0", num_labels=1)
 
     try:
         model.load_state_dict(torch.load(out_dir / "model"))

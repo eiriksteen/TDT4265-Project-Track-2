@@ -12,7 +12,7 @@ from mis.settings import DEVICE, ASOCA_PATH
 
 if __name__ == "__main__":
 
-    model_dir = Path.cwd() / "unet2d_training_results_dice_asoca" / "model"
+    model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"
     model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
 
