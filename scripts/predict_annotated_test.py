@@ -22,9 +22,9 @@ def hausdorff_95(submission, groundtruth, spacing):
     Calculate the 95th percentile of the Hausdorff distance between two binary masks.
 
     Args:
-        submission: Predicted binary mask
-        groundtruth: Ground truth binary mask
-        spacing: Spacing of the CT scan
+        submission (numpy.ndarray): Predicted binary mask
+        groundtruth (numpy.ndarray): Ground truth binary mask
+        spacing (numpy.ndarray): Spacing of the CT scan
 
     Returns:
         float: The 95th percentile of the Hausdorff distance
