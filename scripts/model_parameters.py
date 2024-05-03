@@ -8,7 +8,7 @@ import nrrd
 import torch.nn.functional as F
 from torchvision.transforms import Resize
 from transformers import SegformerForSemanticSegmentation, SegformerConfig
-from mis.models import UNet2D
+from mis.models import UNet2D, UNet2DNonLocal
 from mis.settings import DEVICE, ASOCA_PATH
 import time
 
@@ -18,7 +18,13 @@ def get_model_unet2d(model_name):
     scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
     model_dir = scripts_dir / f"{model_name}" / "model"
     
-    model = UNet2D(1, 1).to(DEVICE)
+    if "nonlocal" in model_name:
+        if "concat" in model_name:
+            model = UNet2DNonLocal(1, 1, skip_conn="concat").to(DEVICE)
+        else:
+            model = UNet2DNonLocal(1, 1, skip_conn="sum").to(DEVICE)
+    else:
+        model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
     return model
 
@@ -35,9 +41,8 @@ def get_model_segformer(model_name):
 if __name__ == "__main__":
     
     model_names = [
-        "unet2d_results_dice_concat_t",
-        "unet2d_results_dice_sum_t",
-        "segformer_training_results_dice_asoca_base"
+        "segformer_results_dice_patientwise_low_lr",
+        "segformer_results_dice_t_patientwise",
     ]
     
     for model_name in model_names:
