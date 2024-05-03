@@ -214,7 +214,9 @@ if __name__ == "__main__":
     
     model_names = [
         # "unet2d_nonlocal_results_dice_concat_t_patientwise",
-        "segformer_results_dice_t_patientwise_killed"
+        # "segformer_results_dice_t_patientwise_killed",
+        "segformer_results_dice_patientwise_low_lr",
+        "segformer_results_dice_t_patientwise"
     ]
     number_of_patients = 2
     
