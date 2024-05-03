@@ -14,9 +14,8 @@ import time
 
 def perform_runtime_analysis_unet(model_name, number_of_patients=3):
     
-    # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
-    scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
-    model_dir = scripts_dir / f"{model_name}" / "epoch2" / "model"
+    scripts_dir = Path.cwd()
+    model_dir = scripts_dir / f"{model_name}" / "epoch2" / "model"   # Change to correct epoch (best epoch)
     
     if "nonlocal" in model_name:
         if "concat" in model_name:
@@ -116,8 +115,7 @@ def perform_runtime_analysis_unet(model_name, number_of_patients=3):
 
 def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
     
-    # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
-    scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
+    scripts_dir = Path.cwd()
     model_dir = scripts_dir / f"{model_name}" / "model"
 
     model = SegformerForSemanticSegmentation.from_pretrained("nvidia/mit-b0", num_labels=1).to(DEVICE)
@@ -213,10 +211,7 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
 if __name__ == "__main__":
     
     model_names = [
-        # "unet2d_nonlocal_results_dice_concat_t_patientwise",
-        # "segformer_results_dice_t_patientwise_killed",
-        "segformer_results_dice_patientwise_low_lr",
-        "segformer_results_dice_t_patientwise"
+        # Input your model names here as strings
     ]
     number_of_patients = 2
     

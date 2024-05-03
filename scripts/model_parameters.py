@@ -14,9 +14,8 @@ import time
 
 def get_model_unet2d(model_name):
     
-    # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
-    scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
-    model_dir = scripts_dir / f"{model_name}" / "model"
+    scripts_dir = Path.cwd()
+    model_dir = scripts_dir / f"{model_name}" / "epoch2" / "model"      # Change to correct epoch (best epoch)
     
     if "nonlocal" in model_name:
         if "concat" in model_name:
@@ -30,8 +29,7 @@ def get_model_unet2d(model_name):
 
 def get_model_segformer(model_name):
     
-    # model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"     # For Mac
-    scripts_dir = Path("C:/Users/henri/Desktop/NTNU/4.Året/Vår/TDT 4265 - Computer Vision/TDT4265-Computer-Vision/coronary-artery-segmentation/scripts")
+    scripts_dir = Path.cwd()
     model_dir = scripts_dir / f"{model_name}" / "model"
     
     model = SegformerForSemanticSegmentation.from_pretrained("nvidia/mit-b0", num_labels=1).to(DEVICE)
@@ -41,8 +39,7 @@ def get_model_segformer(model_name):
 if __name__ == "__main__":
     
     model_names = [
-        "segformer_results_dice_patientwise_low_lr",
-        "segformer_results_dice_t_patientwise",
+        # Input your model names here as strings
     ]
     
     for model_name in model_names:
