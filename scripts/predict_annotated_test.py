@@ -18,6 +18,18 @@ from mis.settings import DEVICE, ASOCA_PATH
 
 # Copied from https://github.com/ramtingh/ASOCA_MICCAI2020_Evaluation/blob/master/evaluation.py
 def hausdorff_95(submission, groundtruth, spacing):
+    """
+    Calculate the 95th percentile of the Hausdorff distance between two binary masks.
+
+    Args:
+        submission: Predicted binary mask
+        groundtruth: Ground truth binary mask
+        spacing: Spacing of the CT scan
+
+    Returns:
+        float: The 95th percentile of the Hausdorff distance
+    """
+    
     
     # There are more efficient algorithms for hausdorff distance than brute force, however, brute force is sufficient for datasets of this size.
     submission_points = spacing*np.array(np.where(submission), dtype=np.uint16).T
@@ -31,6 +43,16 @@ def hausdorff_95(submission, groundtruth, spacing):
     return max(np.quantile(distances1,0.95), np.quantile(distances2,0.95))
 
 def dice(y_true, y_pred):
+    """
+    Calculate the Dice score between two binary masks.
+
+    Args:
+        y_true (numpy.ndarray): Ground truth binary mask
+        y_pred (numpy.ndarray): Predicted binary mask
+
+    Returns:
+        float: The Dice score
+    """
     return 2 * (y_true*y_pred).sum() / (y_true.sum()+y_pred.sum())
 
 if __name__ == "__main__":
