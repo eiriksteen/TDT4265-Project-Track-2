@@ -17,7 +17,8 @@ from mis.datasets import ASOCADataset
 from mis.settings import DEVICE, ASOCA_PATH
 
 # Copied from https://github.com/ramtingh/ASOCA_MICCAI2020_Evaluation/blob/master/evaluation.py
-def hausdorff_95(submission,groundtruth, spacing):
+def hausdorff_95(submission, groundtruth, spacing):
+    
     # There are more efficient algorithms for hausdorff distance than brute force, however, brute force is sufficient for datasets of this size.
     submission_points = spacing*np.array(np.where(submission), dtype=np.uint16).T
     submission_kdtree = cKDTree(submission_points)
@@ -33,6 +34,17 @@ def dice(y_true, y_pred):
     return 2 * (y_true*y_pred).sum() / (y_true.sum()+y_pred.sum())
 
 if __name__ == "__main__":
+    """
+    Tests the model on the set test set to get dice and hausdorff scores.
+    
+    Args:
+        --skip_conn: Skip connection type to use. Must be one of "concat" or "add"
+        --non_local: Whether to use non-local blocks
+        --thresh: Whether to threshold the predictions
+        
+    Returns:
+        None: Saves the predictions to a directory
+    """
 
     parser = argparse.ArgumentParser()
 

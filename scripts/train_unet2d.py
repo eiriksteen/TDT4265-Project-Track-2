@@ -175,6 +175,23 @@ def train(
 
 
 if __name__ == "__main__":
+    """
+    Trains a 2D UNet model on the ASOCA dataset or the BraTS dataset.
+ 
+    Args:
+        --lr: Learning rate for the optimizer
+        --batch_size: Batch size for training
+        --num_epochs: Number of epochs to train for
+        --loss: Loss function to use. Must be one of "dice", "focal", or "gdlv"
+        --dataset: Dataset to use. Must be one of "asoca" or "brats"
+        --skip_conn: Skip connection type to use. Must be one of "concat" or "add"
+        --split_strat: Split strategy to use. Must be one of "patientwise" or "random"
+        --merge_test_val: Whether to merge the test and validation sets
+        --thresh: Whether to threshold the predictions
+ 
+    Returns:
+        None: Stores the model and metrics in a directory
+    """
 
     parser = argparse.ArgumentParser()
 

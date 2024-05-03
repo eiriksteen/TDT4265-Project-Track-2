@@ -80,6 +80,16 @@ def train_unet(
 
 if __name__ == "__main__":
 
+    """
+    Trains a 3D UNet model on the BraTS dataset.
+ 
+    Args:
+        None: Alter the parameters manually
+ 
+    Returns:
+        None: Saves the model to a directory
+    """
+
     data = BratsDataset(
         "train",
         size=64,

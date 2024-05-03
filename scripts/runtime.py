@@ -21,7 +21,7 @@ def perform_runtime_analysis_unet(model_name, number_of_patients=3):
         if "concat" in model_name:
             model = UNet2DNonLocal(1, 1, skip_conn="concat").to(DEVICE)
         else:
-            model = UNet2DNonLocal(1, 1, skip_conn="sum").to(DEVICE)
+            model = UNet2DNonLocal(1, 1, skip_conn="add").to(DEVICE)
     else:
         model = UNet2D(1, 1).to(DEVICE)
     model.load_state_dict(torch.load(model_dir, map_location="cpu"))
@@ -114,6 +114,16 @@ def perform_runtime_analysis_unet(model_name, number_of_patients=3):
     
 
 def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
+    """
+    Perform runtime analysis on the Segformer model.
+
+    Args:
+        model_name (str): Name of the model to analyze.
+        number_of_patients (int, optional): Number of patients used when analyzing. Defaults to 3.
+    
+    Returns:
+        None: Prints inference times and saves them to a file
+    """
     
     scripts_dir = Path.cwd()
     model_dir = scripts_dir / f"{model_name}" / "model"
@@ -209,6 +219,15 @@ def perform_runtime_analysis_segformer(model_name, number_of_patients=3):
 
 
 if __name__ == "__main__":
+    """
+    Perform runtime analysis on the models.
+    
+    Args:
+        None: Alter the model names and number of patients manually
+    
+    Returns:
+        None: Prints inference times and saves them to a file
+    """
     
     model_names = [
         # Input your model names here as strings

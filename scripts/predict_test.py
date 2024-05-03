@@ -11,6 +11,15 @@ from mis.models import UNet2D
 from mis.settings import DEVICE, ASOCA_PATH
 
 if __name__ == "__main__":
+    """
+    Tests the model on the test set of the ASOCA dataset to get a submission for the ASOCA Grand Challenge.
+ 
+    Args:
+        None: Alter the model_dir manually
+ 
+    Returns:
+        None: Saves the predictions to a directory
+    """
 
     model_dir = Path.cwd() / "unet2d_training_results_dice_asoca_tNone" / "model"
     model = UNet2D(1, 1).to(DEVICE)
